@@ -1,0 +1,16 @@
+{
+  "name": "node",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "compile_tailwind": "tailwind build -i ../static/css/tailwind.css -o ../static/css/style.css --watch",
+    "minify_css": "cleancss ../static/css/style.css -o ../static/css/style.min.css"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "tailwindcss": "^3.4.7"
+  }
+}

@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* .skeleton-wrapper>.skeleton-loader {
+    @apply hidden;
+}
+.skeleton-wrapper>.skeleton-content {
+    @apply block;
+}
+.htmx-request.skeleton-wrapper>.skeleton-loader {
+    @apply block skeleton;
+}
+.htmx-request.skeleton-wrapper>.skeleton-content {
+    @apply invisible;
+}
+
+[x-cloak] {
+    @apply hidden;
+} */

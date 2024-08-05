@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<h1>Home</h1>
+<p>Welcome to eBayes</p>
+<button hx-get="/test-htmx/" hx-trigger="click" hx-swap="innerHTML">Click me</button>
+{% endblock body %}

@@ -1,7 +1,7 @@
 {% load static %}
 {% load django_htmx %}
 <!DOCTYPE html>
-<html lang="en" data-theme="sunset">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,7 +32,7 @@
       {% block content %}
       {% endblock content %}
     </div>
-    
+
     <!-- CSRF script for HTMX -->
     <script>
         document.body.addEventListener('htmx:configRequest', (event) => {

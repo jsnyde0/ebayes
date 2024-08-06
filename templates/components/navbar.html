@@ -70,7 +70,7 @@
             <!-- Night Mode Toggle -->
             <label class="grid cursor-pointer place-items-center mx-1">
                 <input type="checkbox"
-                       data-toggle-theme="dark,light"
+                       data-toggle-theme="dark,retro"
                        data-act-class="ACTIVECLASS"
                        value="dark"
                        class="toggle theme-controller bg-base-content col-span-2 col-start-1 row-start-1" />
@@ -524,7 +524,7 @@
   themeController.addEventListener('change', function() {
     const htmlTag = document.documentElement;
     const currentTheme = htmlTag.getAttribute('data-theme');
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    const newTheme = currentTheme === 'retro' ? 'dark' : 'retro';
     htmlTag.setAttribute('data-theme', newTheme);
     
     // Optionally save the theme preference to localStorage

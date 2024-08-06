@@ -7,13 +7,19 @@
   <p class="mb-6 text-lg">
     Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
-  <div id="charts-container" class="grid grid-cols-2 gap-4"></div>
+  <div id="charts-container" class="grid grid-cols-2 gap-4">
+    {% for predictor in predictors %}
+      <div class="h-[400px] mb-5">
+        <canvas id="chart-{{ forloop.counter }}"></canvas>
+      </div>
+    {% endfor %}
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const labels = {{ labels|safe }};
-      const datasets = {{ datasets|safe }};
+      const salesData = {{ sales_data|safe }};
 
       function createChart(containerId, dataset) {
         const ctx = document.getElementById(containerId);
@@ -28,7 +34,7 @@
               yAxisID: 'y',
             }, {
               label: 'Sales',
-              data: datasets[0].data,
+              data: salesData,
               borderColor: 'rgb(192, 75, 75)',
               yAxisID: 'y1',
             }]
@@ -78,18 +84,12 @@
         });
       }
 
-      const chartsContainer = document.getElementById('charts-container');
-      datasets.forEach((dataset, index) => {
-        if (index === 0) return; // Skip the first dataset (sales)
-        const chartDiv = document.createElement('div');
-        chartDiv.style.height = '400px';  // Set a fixed height
-        chartDiv.style.marginBottom = '20px';  // Add some margin between charts
-        const canvas = document.createElement('canvas');
-        canvas.id = `chart-${index}`;
-        chartDiv.appendChild(canvas);
-        chartsContainer.appendChild(chartDiv);
-        createChart(`chart-${index}`, dataset);
-      });
+      {% for dataset in predictors %}
+        createChart('chart-{{ forloop.counter }}', {
+          label: '{{ dataset.label }}',
+          data: {{ dataset.data|safe }}
+        });
+      {% endfor %}
     });
   </script>
 {% endblock main %}

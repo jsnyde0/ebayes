@@ -44,9 +44,11 @@ def view_preview(request, file_id):
     
     # Prepare data for Chart.js
     labels = df.iloc[:, 0].tolist()
-    datasets = []
-    for column in df.columns[1:]:
-        datasets.append({
+    sales_data = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    
+    predictors = []
+    for column in df.columns[2:]:  # Start from the third column
+        predictors.append({
             'label': column,
             'data': df[column].apply(clean_euro_value).tolist(),
         })
@@ -54,7 +56,8 @@ def view_preview(request, file_id):
     context = {
         'csv_file': csv_file,
         'labels': json.dumps(labels),
-        'datasets': json.dumps(datasets),
+        'sales_data': json.dumps(sales_data),
+        'predictors': predictors,  # Note: not JSON encoded
     }
     
     return render(request, 'mmm/preview.html', context)

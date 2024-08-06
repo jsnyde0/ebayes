@@ -50,7 +50,7 @@ def clean_euro_value(value):
         # Replace comma with dot if comma is used as decimal separator
         if ',' in cleaned and '.' not in cleaned:
             cleaned = cleaned.replace(',', '.')
-        # Remove thousands separators
-        cleaned = cleaned.replace('.', '').replace(',', '')
+        # Remove thousands separators (only commas)
+        cleaned = cleaned.replace(',', '')
         return float(cleaned)
     return 0.0  # Return 0 for any other type

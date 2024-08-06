@@ -8,4 +8,5 @@ urlpatterns = [
     path('test-htmx/', views.test_htmx, name='test-htmx'),
     path('upload/', views.view_upload, name='upload'),
     path('csv/<uuid:file_id>/', views.serve_csv, name='serve_csv'),
+    path('preview/<uuid:file_id>/', views.view_preview, name='preview'),
 ]

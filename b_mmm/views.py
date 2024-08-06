@@ -26,12 +26,23 @@ def view_upload(request):
                 messages.success(request, f'CSV file "{csv_file.file_name}" uploaded successfully.')
             except ValidationError as e:
                 messages.error(request, str(e))
-            return redirect('mmm:upload')
+            return redirect('mmm:preview', file_id=csv_file.id)
     else:
         form = CSVUploadForm()
     
     # note we're not passing the form to the template, we're just using it for validation
     return render(request, 'mmm/upload.html')
+
+@login_required
+def view_preview(request, file_id):
+    csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
+    
+    # For now, we'll just pass the CSV file object to the template
+    context = {
+        'csv_file': csv_file,
+    }
+    
+    return render(request, 'mmm/preview.html', context)
     
 @login_required
 def serve_csv(request, file_id):

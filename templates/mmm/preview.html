@@ -1,0 +1,10 @@
+{% extends "layouts/default.html" %}
+{% block main %}
+  <h1 class="mb-6 text-3xl">Preview Your Data</h1>
+  <h2 class="mb-6 text-2xl">
+    {{ csv_file.file_name }}
+  </h2>
+  <p class="mb-6 text-lg">
+    Here is a preview of your data. You can download the full file <a href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
+  </p>
+{% endblock main %}

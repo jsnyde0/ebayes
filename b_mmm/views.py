@@ -1,10 +1,13 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib import messages
-from django.shortcuts import redirect
-from django.core.files import UploadedFile
-import csv
-import io
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, get_object_or_404
+from django.http import HttpResponseForbidden, FileResponse
+from .forms import CSVUploadForm
+from .models import CSVFile
+from django.core.exceptions import ValidationError
+from .utils import process_csv
 
 # Create your views here.
 def view_home(request):
@@ -13,30 +16,29 @@ def view_home(request):
 def test_htmx(request):
     return HttpResponse('HTMX Works!')
 
+@login_required
 def view_upload(request):
-    if request.method == 'POST' and request.FILES.get('csv_file'):
-        csv_file: UploadedFile = request.FILES['csv_file']
-        if not csv_file.name.endswith('.csv'):
-            messages.error(request, 'Please upload a CSV file.')
+    if request.method == 'POST':
+        form = CSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                csv_file: CSVFile = process_csv(form.cleaned_data['csv_file'], request.user)
+                messages.success(request, f'CSV file "{csv_file.file_name}" uploaded successfully.')
+            except ValidationError as e:
+                messages.error(request, str(e))
             return redirect('mmm:upload')
-        
-        if csv_file.size > 5 * 1024 * 1024:  # 5 MB limit
-            messages.error(request, 'File size must be under 5 MB.')
-            return redirect('mmm:upload')
-        
-        try:
-            decoded_file = csv_file.read().decode('utf-8')
-            io_string = io.StringIO(decoded_file)
-            print('Uploaded CSV: ', io_string)
-            for row in csv.reader(io_string, delimiter=','):
-                # Process each row of the CSV file
-                # For example:
-                # YourModel.objects.create(field1=row[0], field2=row[1], ...)
-                print(row)
-            messages.success(request, 'CSV file uploaded successfully.')
-        except Exception as e:
-            messages.error(request, f'An error occurred: {str(e)}')
-            
-        return redirect('mmm:upload')
+    else:
+        form = CSVUploadForm()
     
+    # note we're not passing the form to the template, we're just using it for validation
     return render(request, 'mmm/upload.html')
+    
+@login_required
+def serve_csv(request, file_id):
+    csv_file = get_object_or_404(CSVFile, id=file_id)
+    if csv_file.user != request.user:
+        return HttpResponseForbidden("You don't have permission to access this file.")
+    
+    response = FileResponse(csv_file.file, content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{csv_file.file_name}"'
+    return response

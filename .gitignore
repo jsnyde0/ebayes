@@ -170,3 +170,6 @@ media/
 
 # powershell scripts
 *.ps1
+
+# testing data
+.data/

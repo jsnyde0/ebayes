@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="antialiased bg-base-200 dark:bg-base-100">
+        <!-- Navbar -->
+        {% include "components/navbar.html" %}
+        <!-- Sidebar -->
+        {% include "components/sidebar.html" %}
+        <main class="p-4 md:ml-64 h-auto pt-20">
+            {% block main %}
+            {% endblock main %}
+        </main>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    {% block component_js %}{% endblock component_js %}
+    {% block page_js %}{% endblock page_js %}
+{% endblock extra_js %}

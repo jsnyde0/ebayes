@@ -23,8 +23,8 @@
         <input id="csv_file" name="csv_file" type="file" accept=".csv" required class="hidden" />
       </label>
     </div>
-    <div id="file-name" class="mt-2 text-center text-sm text-base-content hidden"></div>
-    <div id="file-error" class="mt-2 text-center text-sm text-error hidden"></div>
+    <div id="file_name" class="mt-2 text-center text-sm text-base-content hidden"></div>
+    <div id="file_error" class="mt-2 text-center text-sm text-error hidden"></div>
     <div class="mt-4 flex justify-center">
       <button type="submit" class="btn btn-primary">Upload</button>
     </div>
@@ -37,8 +37,8 @@
   document.addEventListener('DOMContentLoaded', (event) => {
     const dropzone = document.querySelector('label[for="csv_file"]');
     const fileInput = document.getElementById('csv_file');
-    const fileNameDisplay = document.getElementById('file-name');
-    const fileErrorDisplay = document.getElementById('file-error');
+    const fileNameDisplay = document.getElementById('file_name');
+    const fileErrorDisplay = document.getElementById('file_error');
 
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -99,4 +99,4 @@
     }
   });
 </script>
-{% endblock %}
+{% endblock extra_js %}

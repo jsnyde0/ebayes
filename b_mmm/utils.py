@@ -42,4 +42,15 @@ def process_csv(csv_file, user):
         raise ValidationError(f'Error processing CSV: {str(e)}')
     
 def clean_euro_value(value):
-    return float(value.replace('€', '').replace(',', ''))
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        # Remove € symbol and whitespace
+        cleaned = value.replace('€', '').strip()
+        # Replace comma with dot if comma is used as decimal separator
+        if ',' in cleaned and '.' not in cleaned:
+            cleaned = cleaned.replace(',', '.')
+        # Remove thousands separators
+        cleaned = cleaned.replace('.', '').replace(',', '')
+        return float(cleaned)
+    return 0.0  # Return 0 for any other type

@@ -5,69 +5,91 @@
     {{ csv_file.file_name }}
   </h2>
   <p class="mb-6 text-lg">
-    Here is a preview of your data. You can download the full file <a href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
+    Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
-  <canvas id="myChart"></canvas>
+  <div id="charts-container" class="grid grid-cols-2 gap-4"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    const ctx = document.getElementById('myChart');
-    const data = {{ data|safe }};
-    const labels = {{ labels|safe }};
+    document.addEventListener('DOMContentLoaded', function() {
+      const labels = {{ labels|safe }};
+      const datasets = {{ datasets|safe }};
 
-    // Log data for debugging
-    console.log("Data:", data.slice(0, 5));
-    console.log("Labels:", labels.slice(0, 5));
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'CSV Data (€)',
-            data: data,
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: {
-              beginAtZero: false,
-              ticks: {
-                callback: function(value, index, values) {
-                  return '€' + value.toLocaleString();
+      function createChart(containerId, dataset) {
+        const ctx = document.getElementById(containerId);
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: dataset.label,
+              data: dataset.data,
+              borderColor: 'rgb(75, 192, 192)',
+              yAxisID: 'y',
+            }, {
+              label: 'Sales',
+              data: datasets[0].data,
+              borderColor: 'rgb(192, 75, 75)',
+              yAxisID: 'y1',
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            scales: {
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                ticks: {
+                  callback: function(value, index, values) {
+                    return '€' + value.toLocaleString();
+                  }
+                }
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                grid: {
+                  drawOnChartArea: false,
+                },
+                ticks: {
+                  callback: function(value, index, values) {
+                    return '€' + value.toLocaleString();
+                  }
                 }
               }
-            }
-          },
-          plugins: {
-            zoom: {
-              pan: {
-                enabled: true,
-                mode: 'xy',
-              },
-              zoom: {
-                wheel: {
-                  enabled: true,
-                },
-                pinch: {
-                  enabled: true
-                },
-                mode: 'xy',
-              }
             },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return '€' + context.parsed.y.toLocaleString();
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': €' + context.parsed.y.toLocaleString();
+                  }
                 }
               }
             }
           }
-        }
+        });
+      }
+
+      const chartsContainer = document.getElementById('charts-container');
+      datasets.forEach((dataset, index) => {
+        if (index === 0) return; // Skip the first dataset (sales)
+        const chartDiv = document.createElement('div');
+        chartDiv.style.height = '400px';  // Set a fixed height
+        chartDiv.style.marginBottom = '20px';  // Add some margin between charts
+        const canvas = document.createElement('canvas');
+        canvas.id = `chart-${index}`;
+        chartDiv.appendChild(canvas);
+        chartsContainer.appendChild(chartDiv);
+        createChart(`chart-${index}`, dataset);
       });
-    </script>
+    });
+  </script>
 {% endblock main %}

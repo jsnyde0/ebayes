@@ -42,17 +42,19 @@ def view_preview(request, file_id):
     # Read the CSV file
     df = pd.read_csv(csv_file.file.path)
     
-    # Prepare data for Chart.js (example: first two columns)
+    # Prepare data for Chart.js
     labels = df.iloc[:, 0].tolist()
-    data = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    datasets = []
+    for column in df.columns[1:]:
+        datasets.append({
+            'label': column,
+            'data': df[column].apply(clean_euro_value).tolist(),
+        })
 
-    print("Labels:", labels[:5])  # Print first 5 labels
-    print("Data:", data[:5])  # Print first 5 data points
-    
     context = {
         'csv_file': csv_file,
         'labels': json.dumps(labels),
-        'data': json.dumps(data),
+        'datasets': json.dumps(datasets),
     }
     
     return render(request, 'mmm/preview.html', context)

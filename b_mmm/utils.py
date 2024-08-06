@@ -40,3 +40,6 @@ def process_csv(csv_file, user):
     except Exception as e:
         csv_file_instance.delete()  # Clean up on failure
         raise ValidationError(f'Error processing CSV: {str(e)}')
+    
+def clean_euro_value(value):
+    return float(value.replace('€', '').replace(',', ''))

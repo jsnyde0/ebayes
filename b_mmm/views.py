@@ -7,7 +7,9 @@ from django.http import HttpResponseForbidden, FileResponse
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
-from .utils import process_csv
+from .utils import process_csv, clean_euro_value
+import json
+import pandas as pd
 
 # Create your views here.
 def view_home(request):
@@ -37,9 +39,20 @@ def view_upload(request):
 def view_preview(request, file_id):
     csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
-    # For now, we'll just pass the CSV file object to the template
+    # Read the CSV file
+    df = pd.read_csv(csv_file.file.path)
+    
+    # Prepare data for Chart.js (example: first two columns)
+    labels = df.iloc[:, 0].tolist()
+    data = df.iloc[:, 1].apply(clean_euro_value).tolist()
+
+    print("Labels:", labels[:5])  # Print first 5 labels
+    print("Data:", data[:5])  # Print first 5 data points
+    
     context = {
         'csv_file': csv_file,
+        'labels': json.dumps(labels),
+        'data': json.dumps(data),
     }
     
     return render(request, 'mmm/preview.html', context)

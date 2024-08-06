@@ -1,0 +1,102 @@
+{% extends "layouts/default.html" %}
+{% block main %}
+  <h1 class="mb-6 text-3xl">Upload CSV</h1>
+
+  <form method="post" enctype="multipart/form-data" class="mb-6">
+    {% csrf_token %}
+    <div class="flex items-center justify-center w-full">
+      <label for="csv_file"
+             class="flex flex-col items-center justify-center w-full h-64 border-2 border-base-300 border-dashed rounded-lg cursor-pointer bg-base-300 dark:bg-base-300 hover:bg-base-100 dark:border-base-200 dark:hover:border-base-100 dark:hover:bg-base-200">
+        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+          <svg class="w-8 h-8 mb-4 text-base-content dark:text-base-content"
+               aria-hidden="true"
+               xmlns="http://www.w3.org/2000/svg"
+               fill="none"
+               viewBox="0 0 20 16">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+          </svg>
+          <p class="mb-2 text-sm text-base-content dark:text-base-content">
+            <span class="font-semibold">Click to upload</span> or drag and drop
+          </p>
+          <p class="text-xs text-base-content dark:text-base-content">CSV Only</p>
+        </div>
+        <input id="csv_file" name="csv_file" type="file" accept=".csv" required class="hidden" />
+      </label>
+    </div>
+    <div id="file-name" class="mt-2 text-center text-sm text-base-content hidden"></div>
+    <div id="file-error" class="mt-2 text-center text-sm text-error hidden"></div>
+    <div class="mt-4 flex justify-center">
+      <button type="submit" class="btn btn-primary">Upload</button>
+    </div>
+  </form>
+  
+{% endblock main %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', (event) => {
+    const dropzone = document.querySelector('label[for="csv_file"]');
+    const fileInput = document.getElementById('csv_file');
+    const fileNameDisplay = document.getElementById('file-name');
+    const fileErrorDisplay = document.getElementById('file-error');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, unhighlight, false);
+    });
+
+    // Handle dropped files
+    dropzone.addEventListener('drop', handleDrop, false);
+
+    // Handle file selection
+    fileInput.addEventListener('change', handleFiles, false);
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function highlight() {
+      dropzone.classList.add('bg-base-100');
+    }
+
+    function unhighlight() {
+      dropzone.classList.remove('bg-base-100');
+    }
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      handleFiles({target: {files: files}});
+    }
+
+    function handleFiles(e) {
+      const files = e.target.files;
+      if (files.length) {
+        const file = files[0];
+        if (file.name.endsWith('.csv')) {
+          fileNameDisplay.textContent = `Selected file: ${file.name}`;
+          fileNameDisplay.classList.remove('hidden');
+          fileErrorDisplay.classList.add('hidden');
+          fileInput.files = files;  // Set the file to the input
+        } else {
+          fileErrorDisplay.textContent = 'Please select a CSV file.';
+          fileErrorDisplay.classList.remove('hidden');
+          fileNameDisplay.classList.add('hidden');
+          fileInput.value = '';  // Clear the input
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

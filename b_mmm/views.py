@@ -7,3 +7,6 @@ def view_home(request):
 
 def test_htmx(request):
     return HttpResponse('HTMX Works!')
+
+def view_upload(request):
+    return render(request, 'mmm/upload.html')

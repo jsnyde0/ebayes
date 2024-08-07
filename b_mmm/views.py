@@ -64,13 +64,17 @@ def view_preview(request, file_id):
 
 @login_required
 def test_chart(request):
-    # Generate some random data for our chart
-    labels = ['January', 'February', 'March', 'April', 'May', 'June', 'July']
-    data = [83, 96, 27, 32, 5, 70, 97]
+    csv_id = "419877a8-25b2-484f-a327-0b6863175bf6"
+    csv_file = get_object_or_404(CSVFile, id=csv_id, user=request.user)
+
+    df = pd.read_csv(csv_file.file.path)
+    # Prepare data for Chart.js
+    labels = df.iloc[:, 0].tolist()
+    sales_data = df.iloc[:, 1].apply(clean_euro_value).tolist()
     
     context = {
         'labels': labels,
-        'data': data,
+        'data': sales_data,
     }
     return render(request, 'mmm/test_chart.html', context)
     

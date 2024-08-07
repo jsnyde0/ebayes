@@ -1,26 +1,59 @@
-<c-vars :chart_data="[]" :chart_labels="[]" />
+{% load custom_filters %}
 
-<canvas id="lineChart"></canvas>
+<c-vars 
+  :index="[]"
+  :series="[]"
+  :series_labels="[]"
+  chart_id="myChart"
+  chart_title=""
+  x_label=""
+  y_label=""
+  x_unit=""
+  y_unit=""
+  :colors="['rgb(75, 192, 192)']"
+/>
+
+<canvas id="{{ chart_id }}"></canvas>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var ctx = document.getElementById('lineChart').getContext('2d');
+        var ctx = document.getElementById('{{ chart_id }}').getContext('2d');
         var myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: {{ chart_labels|safe }},
-                datasets: [{
-                    label: '# of Items',
-                    data: {{ chart_data|safe }},
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
+                labels: {{ index|safe }},
+                datasets: [
+                    {% for serie in series %}
+                    {
+                        label: '{{ series_labels|get_item:forloop.counter0 }}',
+                        data: {{ serie|safe }},
+                        borderColor: '{{ colors|get_item:forloop.counter0 }}',
+                        tension: 0.1
+                    }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ]
             },
             options: {
                 responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '{{ chart_title }}'
+                    }
+                },
                 scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
+                        }
                     }
                 }
             }

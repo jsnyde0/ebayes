@@ -2,14 +2,22 @@
 {% block main %}
   <h1 class="mb-6 text-3xl">Test the Chart Component</h1>
   <h2 class="mb-6 text-2xl">
-    Test Data: [83, 96, 27, 32, 5, 70, 97]
+    {{ csv_file.file_name }}
   </h2>
   <p class="mb-6 text-lg">
-    We don't have a preview of your data. So you can't download it.
+    Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
 
   <div id="charts-container" class="grid grid-cols-2 gap-4">
-    <c-line-chart :chart_data="data" :chart_labels="labels" />
+    <c-line-chart 
+      chart_id="lineChart"  
+      :index="index" 
+      :series="series" 
+      :series_labels="series_labels"
+      x_label="{{ x_label }}"
+      y_label="{{ y_label }}"
+      y_unit="{{ y_unit }}"
+    />
   </div>
 
 {% endblock main %}

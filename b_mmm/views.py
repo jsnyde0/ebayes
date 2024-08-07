@@ -69,12 +69,17 @@ def test_chart(request):
 
     df = pd.read_csv(csv_file.file.path)
     # Prepare data for Chart.js
-    labels = df.iloc[:, 0].tolist()
-    sales_data = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    index = df.iloc[:, 0].tolist()
+    series = [df.iloc[:, 1].apply(clean_euro_value).tolist()]
     
     context = {
-        'labels': labels,
-        'data': sales_data,
+        'csv_file': csv_file,
+        'index': index,
+        'series': series,
+        'series_labels': ['Sales'],
+        'x_label': 'Date',
+        'y_label': 'Sales',
+        'y_unit': '€'
     }
     return render(request, 'mmm/test_chart.html', context)
     

@@ -1,0 +1,15 @@
+{% extends "layouts/default.html" %}
+{% block main %}
+  <h1 class="mb-6 text-3xl">Test the Chart Component</h1>
+  <h2 class="mb-6 text-2xl">
+    Test Data: [83, 96, 27, 32, 5, 70, 97]
+  </h2>
+  <p class="mb-6 text-lg">
+    We don't have a preview of your data. So you can't download it.
+  </p>
+
+  <div id="charts-container" class="grid grid-cols-2 gap-4">
+    <c-line-chart :chart_data="[83, 96, 27, 32, 5, 70, 97]" :chart_labels="['1', '2', '3', '4', '5', '6', '7']" />
+  </div>
+
+{% endblock main %}

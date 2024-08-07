@@ -61,6 +61,18 @@ def view_preview(request, file_id):
     }
     
     return render(request, 'mmm/preview.html', context)
+
+@login_required
+def test_chart(request):
+    # Generate some random data for our chart
+    labels = ['January', 'February', 'March', 'April', 'May', 'June', 'July']
+    data = [83, 96, 27, 32, 5, 70, 97]
+    
+    context = {
+        'labels': labels,
+        'data': data,
+    }
+    return render(request, 'mmm/test_chart.html', context)
     
 @login_required
 def serve_csv(request, file_id):

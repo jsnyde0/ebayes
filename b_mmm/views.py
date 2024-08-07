@@ -70,15 +70,17 @@ def test_chart(request):
     df = pd.read_csv(csv_file.file.path)
     # Prepare data for Chart.js
     index = df.iloc[:, 0].tolist()
-    series = [df.iloc[:, 1].apply(clean_euro_value).tolist()]
+    series1 = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    series2 = df.iloc[:, 2].apply(clean_euro_value).tolist()
+    series_labels = df.columns[1:3].tolist()
     
     context = {
         'csv_file': csv_file,
         'index': index,
-        'series': series,
-        'series_labels': ['Sales'],
+        'series': [series1, series2],
+        'series_labels': series_labels,
         'x_label': 'Date',
-        'y_label': 'Sales',
+        'y_label': 'Value',
         'y_unit': '€'
     }
     return render(request, 'mmm/test_chart.html', context)

@@ -15,9 +15,52 @@
         :index="index" 
         :series="series" 
         :series_labels="series_labels"
+        :series_axes="['y_left', 'y_left']"
         x_label="{{ x_label }}"
-        y_label="{{ y_label }}"
-        y_unit="{{ y_unit }}"
+        y_label_left="{{ y_label }}"
+        y_unit_left="{{ y_unit }}"
+        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      />
+    </div>
+
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+      <c-line-chart 
+        chart_id="page_load_chart"  
+        :index="index" 
+        :series="series" 
+        :series_labels="series_labels"
+        :series_axes="['y_left', 'y_right']"
+        x_label="{{ x_label }}"
+        y_label_left="{{ y_label }}"
+        y_unit_left="{{ y_unit }}"
+        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      />
+    </div>
+
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+      <c-line-chart 
+        chart_id="page_load_chart"  
+        :index="index" 
+        :series="series" 
+        :series_labels="series_labels"
+        :series_axes="['y_right', 'y_left']"
+        x_label="{{ x_label }}"
+        y_label_left="{{ y_label }}"
+        y_unit_left="{{ y_unit }}"
+        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      />
+    </div>
+
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+      <c-line-chart 
+        chart_id="page_load_chart"  
+        :index="index" 
+        :series="series" 
+        :series_labels="series_labels"
+        :series_axes="['y_right', 'y_right']"
+        x_label="{{ x_label }}"
+        y_label_left="{{ y_label }}"
+        y_unit_left="{{ y_unit }}"
         :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
       />
     </div>

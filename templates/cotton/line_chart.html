@@ -9,13 +9,16 @@ It allows for customization of chart data, labels, and appearance.
 <c-vars 
     :index="[]"
     :series="[]" 
-    :series_labels="[]" 
+    :series_labels="[]"
+    :series_axes="[]"
     chart_id="myChart" 
     chart_title="" 
     x_label="" 
-    y_label="" 
+    y_label_left=""
+    y_label_right=""
     x_unit="" 
-    y_unit="" 
+    y_unit_left=""
+    y_unit_right="" 
     colors="['rgb(75, 192, 192)']" 
 />
 
@@ -23,12 +26,15 @@ It allows for customization of chart data, labels, and appearance.
         '{{ chart_id }}', 
         {{ index|safe }}, 
         {{ series|safe }}, 
-        {{ series_labels|safe }}, 
+        {{ series_labels|safe }},
+        {{ series_axes|safe }},
         '{{ chart_title }}', 
         '{{ x_label }}', 
-        '{{ y_label }}', 
+        '{{ y_label_left }}', 
+        '{{ y_label_right }}', 
         '{{ x_unit }}', 
-        '{{ y_unit }}', 
+        '{{ y_unit_left }}', 
+        '{{ y_unit_right }}', 
         {{ colors|safe }})"
      x-init="createChartIfNotExists"
      class="w-full h-full"
@@ -40,7 +46,7 @@ It allows for customization of chart data, labels, and appearance.
 <script>
     {% comment %} Initialize Alpine.js component when the DOM is ready {% endcomment %}
   document.addEventListener('alpine:init', () => {
-    Alpine.data('lineChart', (chartId, index, series, seriesLabels, chartTitle, xLabel, yLabel, xUnit, yUnit, colors) => ({
+    Alpine.data('lineChart', (chartId, index, series, seriesLabels, seriesAxes, chartTitle, xLabel, yLabelLeft, yLabelRight, xUnit, yUnitLeft, yUnitRight, colors) => ({
       chartId,
       chart: null,
   
@@ -63,7 +69,8 @@ It allows for customization of chart data, labels, and appearance.
               label: seriesLabels[i],
               data: data,
               borderColor: colors[i],
-              tension: 0.1 // Slight curve in the line
+              tension: 0.1, // Slight curve in the line
+              yAxisID: seriesAxes[i] // Use the specified axis
             }))
           },
           options: {
@@ -82,12 +89,26 @@ It allows for customization of chart data, labels, and appearance.
                   text: `${xLabel}${xUnit ? ` (${xUnit})` : ''}` // Add unit to X-axis label if provided
                 }
               },
-              y: {
-                beginAtZero: true,
+              y_left: {
+                type: 'linear',
+                display: true,
+                position: 'left',
                 title: {
                   display: true,
-                  text: `${yLabel}${yUnit ? ` (${yUnit})` : ''}` // Add unit to Y-axis label if provided
+                  text: `${yLabelLeft}${yUnitLeft ? ` (${yUnitLeft})` : ''}`
                 }
+              },
+              y_right: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                  display: true,
+                  text: `${yLabelRight}${yUnitRight ? ` (${yUnitRight})` : ''}`
+                },
+              grid: {
+                  drawOnChartArea: false, // only want the grid lines for one axis to show up
+                },
               }
             }
           }

@@ -24,8 +24,10 @@
         '{{ x_unit }}', 
         '{{ y_unit }}', 
         {{ colors|safe }})"
-     x-init="createChartIfNotExists">
-    <canvas x-ref="canvas" {{ attrs }}></canvas>
+     x-init="createChartIfNotExists"
+     class="w-full h-full"
+     {{ attrs }}>
+    <canvas x-ref="canvas" class="w-full h-full"></canvas>
 </div>
 
 <script>
@@ -38,7 +40,7 @@
         // nextTick is used to ensure that the chart is created after the DOM is fully rendered
         this.$nextTick(() => {
             if (!this.chart) {
-                const ctx = this.$refs.canvas.getContext('2d');
+                const ctx = this.$refs.canvas;
                 this.chart = new Chart(ctx, this.getChartConfig());
             }
         });

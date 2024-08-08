@@ -8,34 +8,43 @@
     Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
 
-  <div id="charts-container" class="grid grid-cols-2 gap-4">
-    <c-line-chart 
-      chart_id="page_load_chart"  
-      :index="index" 
-      :series="series" 
-      :series_labels="series_labels"
-      x_label="{{ x_label }}"
-      y_label="{{ y_label }}"
-      y_unit="{{ y_unit }}"
-      :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
-      class="w-full h-64 md:h-96"
-    />
+  <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+      <c-line-chart 
+        chart_id="page_load_chart"  
+        :index="index" 
+        :series="series" 
+        :series_labels="series_labels"
+        x_label="{{ x_label }}"
+        y_label="{{ y_label }}"
+        y_unit="{{ y_unit }}"
+        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      />
+    </div>
+
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+    <button class="btn btn-primary mx-1"
+    hx-get="{% url 'mmm:test_chart' %}"
+    hx-trigger="click"
+    hx-swap="outerHTML">Click to get chart</button>
+    </div>
+
+    <div id="chart-container" class="h-64 md:h-96 lg:h-[24rem] xl:h-[32rem]">
+    <button class="btn btn-primary mx-1"
+    hx-get="{% url 'mmm:test_chart' %}"
+    hx-trigger="click"
+    hx-swap="outerHTML">Click to get chart</button>
+    </div>
   </div>
 
   <div id="ajax-chart-container" class="grid grid-cols-2 gap-4">
     <!-- HTMX Button -->
-    <button class="btn btn-primary mx-1"
-    hx-get="{% url 'mmm:test_chart' %}"
-    hx-trigger="click"
-    hx-swap="outerHTML">Click to get chart</button>
+    
   </div>
 
   <div id="ajax-chart-container-2" class="grid grid-cols-2 gap-4">
     <!-- HTMX Button -->
-    <button class="btn btn-primary mx-1"
-    hx-get="{% url 'mmm:test_chart' %}"
-    hx-trigger="click"
-    hx-swap="outerHTML">Click to get chart</button>
+    
   </div>
 
 {% endblock main %}

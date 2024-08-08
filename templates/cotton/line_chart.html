@@ -61,6 +61,10 @@ It allows for customization of chart data, labels, and appearance.
       },
   
       getChartConfig() {
+        // Check if the left or right axis is in use
+        const leftAxisInUse = seriesAxes.includes('y_left');
+        const rightAxisInUse = seriesAxes.includes('y_right');
+
         return {
           type: 'line',
           data: {
@@ -91,7 +95,7 @@ It allows for customization of chart data, labels, and appearance.
               },
               y_left: {
                 type: 'linear',
-                display: true,
+                display: leftAxisInUse,
                 position: 'left',
                 title: {
                   display: true,
@@ -100,7 +104,7 @@ It allows for customization of chart data, labels, and appearance.
               },
               y_right: {
                 type: 'linear',
-                display: true,
+                display: rightAxisInUse,
                 position: 'right',
                 title: {
                   display: true,

@@ -77,7 +77,7 @@
             }
         }
 
-        // Ensure chart creation based on DOM readiness
+        // If DOM is ready, create the chart. Else wait for DOM to be ready before creating the chart.
         function createChartOnDOMState() {
             if (document.readyState === 'loading') {
                 // If the DOM is still loading, wait for it to be ready before creating the chart
@@ -90,11 +90,5 @@
 
         // Set up initialization
         createChartOnDOMState();
-
-        document.body.addEventListener('htmx:afterSwap', function(event) {
-            if (event.detail.target.id === '{{ chart_id }}') {
-                createChartIfNeeded();
-            }
-        });
     })();
 </script>

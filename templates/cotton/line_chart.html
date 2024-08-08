@@ -1,7 +1,13 @@
 {% load custom_filters %}
-{% comment %} Set default values for the Cotton component {% endcomment %}
+{% comment %} 
+Cotton Component: Line Chart
+This component creates a responsive line chart using Chart.js, Alpine.js, and Django Cotton.
+It allows for customization of chart data, labels, and appearance.
+{% endcomment %}
+
+{% comment %} c-vars is how you can default values for a Cotton component {% endcomment %}
 <c-vars 
-    :index="[]" 
+    :index="[]"
     :series="[]" 
     :series_labels="[]" 
     chart_id="myChart" 
@@ -27,10 +33,12 @@
      x-init="createChartIfNotExists"
      class="w-full h-full"
      {{ attrs }}>
+     {% comment %} Canvas element where Chart.js will render the chart {% endcomment %}
     <canvas x-ref="canvas" class="w-full h-full"></canvas>
 </div>
 
 <script>
+    {% comment %} Initialize Alpine.js component when the DOM is ready {% endcomment %}
   document.addEventListener('alpine:init', () => {
     Alpine.data('lineChart', (chartId, index, series, seriesLabels, chartTitle, xLabel, yLabel, xUnit, yUnit, colors) => ({
       chartId,
@@ -50,12 +58,12 @@
         return {
           type: 'line',
           data: {
-            labels: index,
+            labels: index, // X-axis values
             datasets: series.map((data, i) => ({
               label: seriesLabels[i],
               data: data,
               borderColor: colors[i],
-              tension: 0.1
+              tension: 0.1 // Slight curve in the line
             }))
           },
           options: {
@@ -71,14 +79,14 @@
               x: {
                 title: {
                   display: true,
-                  text: `${xLabel}${xUnit ? ` (${xUnit})` : ''}`
+                  text: `${xLabel}${xUnit ? ` (${xUnit})` : ''}` // Add unit to X-axis label if provided
                 }
               },
               y: {
                 beginAtZero: true,
                 title: {
                   display: true,
-                  text: `${yLabel}${yUnit ? ` (${yUnit})` : ''}`
+                  text: `${yLabel}${yUnit ? ` (${yUnit})` : ''}` // Add unit to Y-axis label if provided
                 }
               }
             }

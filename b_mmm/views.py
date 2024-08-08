@@ -42,26 +42,59 @@ def view_preview(request, file_id):
     
     # Read the CSV file
     df = pd.read_csv(csv_file.file.path)
-    
     # Prepare data for Chart.js
-    labels = df.iloc[:, 0].tolist()
-    sales_data = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    index = df.iloc[:, 0].tolist()
+    sales = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    predictor = df.iloc[:, 2].apply(clean_euro_value).tolist()
+    series = [sales, predictor]
+    series_labels = df.columns[1:3].tolist()
     
-    predictors = []
-    for column in df.columns[2:]:  # Start from the third column
-        predictors.append({
-            'label': column,
-            'data': df[column].apply(clean_euro_value).tolist(),
-        })
-
     context = {
         'csv_file': csv_file,
-        'labels': json.dumps(labels),
-        'sales_data': json.dumps(sales_data),
-        'predictors': predictors,  # Note: not JSON encoded
+        'chart_id': f'test_chart_{random.randint(0, 1000000)}',
+        'index': index,
+        'series': series,
+        'series_labels': series_labels,
+        'x_label': 'Date',
+        'y_label': 'Value',
+        'y_unit': '€'
     }
     
     return render(request, 'mmm/preview.html', context)
+
+    
+    # Prepare data for Chart.js
+    # index = {
+    #     'label': 'Date',
+    #     'data': df.iloc[:, 0].tolist(),
+    # }
+    # sales = {
+    #     'label': 'Sales',
+    #     'data': df.iloc[:, 1].apply(clean_euro_value).tolist(),
+    # }
+    
+    # predictors = []
+    # for column in df.columns[2:]:  # Start from the third column
+    #     predictors.append({
+    #         'label': column,
+    #         'data': df[column].apply(clean_euro_value).tolist(),
+    #     })
+
+    # context = {
+    #     'csv_file': csv_file,
+    #     'index_data': json.dumps(index['data']),
+    #     'index_label': index['label'],
+    #     'sales_data': json.dumps(sales['data']),
+    #     'sales_label': sales['label'],
+    #     'predictors': [
+    #         {
+    #             'label': p['label'],
+    #             'data': json.dumps(p['data'])
+    #         } for p in predictors
+    #     ],
+    # }
+    
+    # return render(request, 'mmm/preview.html', context)
 
 @login_required
 def test_chart(request):

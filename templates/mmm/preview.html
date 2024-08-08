@@ -7,89 +7,39 @@
   <p class="mb-6 text-lg">
     Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
+  <p>
+    sales.data: {{ sales_data }}
+  </p>
   <div id="charts-container" class="grid grid-cols-2 gap-4">
-    {% for predictor in predictors %}
+    <div class="h-[400px] mb-5">
+      <c-line-chart 
+        chart_id="{{ chart_id }}"  
+        :index="index" 
+        :series="series" 
+        :series_labels="series_labels"
+        :series_axes="['y_left', 'y_left']"
+        x_label="{{ x_label }}"
+        y_label_left="{{ y_label }}"
+        y_label_right="{{ y_label }}"
+        y_unit_left="{{ y_unit }}"
+        y_unit_right="{{ y_unit }}"
+        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      />
+    </div>
+    {% comment %} {% for predictor in predictors %}
       <div class="h-[400px] mb-5">
-        <canvas id="chart-{{ forloop.counter }}"></canvas>
+        <c-line-chart 
+          chart_id="chart-{{ forloop.counter }}"  
+          :index="{{ index_data|safe }}" 
+          :series="[{{ sales_data|safe }}, {{ predictor.data|safe }}]" 
+          :series_labels="['{{ sales_label }}', '{{ predictor.label }}']"
+          :series_axes="['y_left', 'y_left']"
+          x_label="{{ index_label }}"
+          y_label_left="Money"
+          y_unit_left="€"
+          :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+        />
       </div>
-    {% endfor %}
+    {% endfor %} {% endcomment %}
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const labels = {{ labels|safe }};
-      const salesData = {{ sales_data|safe }};
-
-      function createChart(containerId, dataset) {
-        const ctx = document.getElementById(containerId);
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: dataset.label,
-              data: dataset.data,
-              borderColor: 'rgb(75, 192, 192)',
-              yAxisID: 'y',
-            }, {
-              label: 'Sales',
-              data: salesData,
-              borderColor: 'rgb(192, 75, 75)',
-              yAxisID: 'y1',
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-              mode: 'index',
-              intersect: false,
-            },
-            scales: {
-              y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                ticks: {
-                  callback: function(value, index, values) {
-                    return '€' + value.toLocaleString();
-                  }
-                }
-              },
-              y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                grid: {
-                  drawOnChartArea: false,
-                },
-                ticks: {
-                  callback: function(value, index, values) {
-                    return '€' + value.toLocaleString();
-                  }
-                }
-              }
-            },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return context.dataset.label + ': €' + context.parsed.y.toLocaleString();
-                  }
-                }
-              }
-            }
-          }
-        });
-      }
-
-      {% for dataset in predictors %}
-        createChart('chart-{{ forloop.counter }}', {
-          label: '{{ dataset.label }}',
-          data: {{ dataset.data|safe }}
-        });
-      {% endfor %}
-    });
-  </script>
 {% endblock main %}

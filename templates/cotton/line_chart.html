@@ -1,5 +1,5 @@
 {% load custom_filters %}
-
+{% comment %} Set default values for the Cotton component {% endcomment %}
 <c-vars 
     :index="[]" 
     :series="[]" 
@@ -10,85 +10,78 @@
     y_label="" 
     x_unit="" 
     y_unit="" 
-    :colors="['rgb(75, 192, 192)']" 
+    colors="['rgb(75, 192, 192)']" 
 />
 
-<canvas id="{{ chart_id }}"></canvas>
+<div x-data="lineChart(
+        '{{ chart_id }}', 
+        {{ index|safe }}, 
+        {{ series|safe }}, 
+        {{ series_labels|safe }}, 
+        '{{ chart_title }}', 
+        '{{ x_label }}', 
+        '{{ y_label }}', 
+        '{{ x_unit }}', 
+        '{{ y_unit }}', 
+        {{ colors|safe }})"
+     x-init="initChart">
+    <canvas id="{{ chart_id }}"></canvas>
+</div>
 
 <script>
-    (function() {
-        // Construct a new Chart.js instance with the given component configuration
-        function constructChartInstance() {
-            try {
-                const ctx = document.getElementById('{{ chart_id }}').getContext('2d');
-                const myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: {{ index|safe }},
-                        datasets: [
-                            {% for serie in series %}
-                            {
-                                label: '{{ series_labels|get_item:forloop.counter0 }}',
-                                data: {{ serie|safe }},
-                                borderColor: '{{ colors|get_item:forloop.counter0 }}',
-                                tension: 0.1
-                            }{% if not forloop.last %},{% endif %}
-                            {% endfor %}
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: '{{ chart_title }}'
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
-                                }
-                            }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error('Error constructing chart:', error);
-            }
-        }
-
-        // create the chart if it doesn't exist yet
-        function createChartIfNeeded() {
-            const chartElement = document.getElementById('{{ chart_id }}');
-            if (chartElement) {
-                const existingChart = Chart.getChart('{{ chart_id }}');
-                if (!existingChart) {
-                    constructChartInstance();
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('lineChart', (chartId, index, series, seriesLabels, chartTitle, xLabel, yLabel, xUnit, yUnit, colors) => ({
+      chartId,
+      chart: null,
+  
+      createChartIfNotExists() {
+        // nextTick is used to ensure that the chart is created after the DOM is fully rendered
+        this.$nextTick(() => {
+            if (!this.chart) {
+                const ctx = document.getElementById(this.chartId).getContext('2d');
+                this.chart = new Chart(ctx, this.getChartConfig());
+              }
+        });
+      },
+  
+      getChartConfig() {
+        return {
+          type: 'line',
+          data: {
+            labels: index,
+            datasets: series.map((data, i) => ({
+              label: seriesLabels[i],
+              data: data,
+              borderColor: colors[i],
+              tension: 0.1
+            }))
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: chartTitle
+              }
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: `${xLabel}${xUnit ? ` (${xUnit})` : ''}`
                 }
+              },
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: `${yLabel}${yUnit ? ` (${yUnit})` : ''}`
+                }
+              }
             }
-        }
-
-        // If DOM is ready, create the chart. Else wait for DOM to be ready before creating the chart.
-        function createChartOnDOMState() {
-            if (document.readyState === 'loading') {
-                // If the DOM is still loading, wait for it to be ready before creating the chart
-                document.addEventListener('DOMContentLoaded', createChartIfNeeded);
-            } else {
-                // If the DOM is already loaded, (re)create the chart immediately
-                createChartIfNeeded();
-            }
-        }
-
-        // Set up initialization
-        createChartOnDOMState();
-    })();
+          }
+        };
+      }
+    }));
+  });
 </script>

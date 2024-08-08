@@ -17,10 +17,11 @@
     <link rel="icon"
           type="image/png"
           href="{% static 'images/eBayes-logo.png' %}">
-    <script defer
-            src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="{% static 'js/htmx.min.js' %}"></script>
     <script defer src="{% static 'js/chart.js' %}"></script>
+    <script defer src="{% static 'js/htmx.min.js' %}"></script>
+    <script defer src="{% static 'js/alpine.js' %}"></script>
+    
+    
     {% django_htmx_script %}
     <link rel="stylesheet"
           href="{% if debug %}{% static 'css/style.css' %}{% else %}{% static 'css/style.min.css' %}{% endif %}">

@@ -18,6 +18,7 @@
       y_label="{{ y_label }}"
       y_unit="{{ y_unit }}"
       :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
+      class="w-full h-64 md:h-96"
     />
   </div>
 
@@ -28,7 +29,7 @@
     hx-trigger="click"
     hx-swap="outerHTML">Click to get chart</button>
   </div>
-  
+
   <div id="ajax-chart-container-2" class="grid grid-cols-2 gap-4">
     <!-- HTMX Button -->
     <button class="btn btn-primary mx-1"

@@ -10,7 +10,7 @@
 
   <div id="charts-container" class="grid grid-cols-2 gap-4">
     <c-line-chart 
-      chart_id="lineChart"  
+      chart_id="page_load_chart"  
       :index="index" 
       :series="series" 
       :series_labels="series_labels"
@@ -19,6 +19,14 @@
       y_unit="{{ y_unit }}"
       :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
     />
+  </div>
+
+  <div id="ajax-chart-container" class="grid grid-cols-2 gap-4">
+    <!-- HTMX Button -->
+    <button class="btn btn-primary mx-1"
+    hx-get="{% url 'mmm:test_chart' %}"
+    hx-trigger="click"
+    hx-swap="outerHTML">Click to get chart</button>
   </div>
 
 {% endblock main %}

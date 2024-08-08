@@ -83,6 +83,9 @@ def test_chart(request):
         'y_label': 'Value',
         'y_unit': '€'
     }
+    if request.htmx:
+        return render(request, 'partials/line_chart.html', context)
+    
     return render(request, 'mmm/test_chart.html', context)
     
 @login_required

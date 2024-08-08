@@ -1,62 +1,90 @@
 {% load custom_filters %}
 
 <c-vars 
-  :index="[]"
-  :series="[]"
-  :series_labels="[]"
-  chart_id="myChart"
-  chart_title=""
-  x_label=""
-  y_label=""
-  x_unit=""
-  y_unit=""
-  :colors="['rgb(75, 192, 192)']"
+    :index="[]" 
+    :series="[]" 
+    :series_labels="[]" 
+    chart_id="myChart" 
+    chart_title="" 
+    x_label="" 
+    y_label="" 
+    x_unit="" 
+    y_unit="" 
+    :colors="['rgb(75, 192, 192)']" 
 />
 
 <canvas id="{{ chart_id }}"></canvas>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var ctx = document.getElementById('{{ chart_id }}').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {{ index|safe }},
-                datasets: [
-                    {% for serie in series %}
-                    {
-                        label: '{{ series_labels|get_item:forloop.counter0 }}',
-                        data: {{ serie|safe }},
-                        borderColor: '{{ colors|get_item:forloop.counter0 }}',
-                        tension: 0.1
-                    }{% if not forloop.last %},{% endif %}
-                    {% endfor %}
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: '{{ chart_title }}'
-                    }
+    (function() {
+        function initializeChart() {
+            var ctx = document.getElementById('{{ chart_id }}').getContext('2d');
+            var myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: {{ index|safe }},
+                    datasets: [
+                        {% for serie in series %}
+                        {
+                            label: '{{ series_labels|get_item:forloop.counter0 }}',
+                            data: {{ serie|safe }},
+                            borderColor: '{{ colors|get_item:forloop.counter0 }}',
+                            tension: 0.1
+                        }{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ]
                 },
-                scales: {
-                    x: {
+                options: {
+                    responsive: true,
+                    plugins: {
                         title: {
                             display: true,
-                            text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
+                            text: '{{ chart_title }}'
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
+                            }
                         }
                     }
                 }
+            });
+        }
+
+        function initializeIfReady() {
+            if (document.getElementById('{{ chart_id }}')) {
+                // Destroy existing chart if it exists
+                var existingChart = Chart.getChart('{{ chart_id }}');
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                initializeChart();
             }
-        });
-    });
+        }
+
+        // Function to handle both initial load and HTMX swap
+        function handleInitialization() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeIfReady);
+            } else {
+                initializeIfReady();
+            }
+        }
+
+        // Initialize on load
+        handleInitialization();
+
+        // Initialize after HTMX swap
+        document.addEventListener('htmx:afterSwap', initializeIfReady);
+    })();
 </script>

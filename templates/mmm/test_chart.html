@@ -28,5 +28,13 @@
     hx-trigger="click"
     hx-swap="outerHTML">Click to get chart</button>
   </div>
+  
+  <div id="ajax-chart-container-2" class="grid grid-cols-2 gap-4">
+    <!-- HTMX Button -->
+    <button class="btn btn-primary mx-1"
+    hx-get="{% url 'mmm:test_chart' %}"
+    hx-trigger="click"
+    hx-swap="outerHTML">Click to get chart</button>
+  </div>
 
 {% endblock main %}

@@ -17,74 +17,84 @@
 
 <script>
     (function() {
-        function initializeChart() {
-            var ctx = document.getElementById('{{ chart_id }}').getContext('2d');
-            var myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: {{ index|safe }},
-                    datasets: [
-                        {% for serie in series %}
-                        {
-                            label: '{{ series_labels|get_item:forloop.counter0 }}',
-                            data: {{ serie|safe }},
-                            borderColor: '{{ colors|get_item:forloop.counter0 }}',
-                            tension: 0.1
-                        }{% if not forloop.last %},{% endif %}
-                        {% endfor %}
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: '{{ chart_title }}'
-                        }
+        // Construct a new Chart.js instance with the given component configuration
+        function constructChartInstance() {
+            try {
+                const ctx = document.getElementById('{{ chart_id }}').getContext('2d');
+                const myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: {{ index|safe }},
+                        datasets: [
+                            {% for serie in series %}
+                            {
+                                label: '{{ series_labels|get_item:forloop.counter0 }}',
+                                data: {{ serie|safe }},
+                                borderColor: '{{ colors|get_item:forloop.counter0 }}',
+                                tension: 0.1
+                            }{% if not forloop.last %},{% endif %}
+                            {% endfor %}
+                        ]
                     },
-                    scales: {
-                        x: {
+                    options: {
+                        responsive: true,
+                        plugins: {
                             title: {
                                 display: true,
-                                text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
+                                text: '{{ chart_title }}'
                             }
                         },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '{{ x_label }}{% if x_unit %} ({{ x_unit }}){% endif %}'
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '{{ y_label }}{% if y_unit %} ({{ y_unit }}){% endif %}'
+                                }
                             }
                         }
                     }
-                }
-            });
-        }
-
-        function initializeIfReady() {
-            if (document.getElementById('{{ chart_id }}')) {
-                // Destroy existing chart if it exists
-                var existingChart = Chart.getChart('{{ chart_id }}');
-                if (existingChart) {
-                    existingChart.destroy();
-                }
-                initializeChart();
+                });
+            } catch (error) {
+                console.error('Error constructing chart:', error);
             }
         }
 
-        // Function to handle both initial load and HTMX swap
-        function handleInitialization() {
+        // create the chart if it doesn't exist yet
+        function createChartIfNeeded() {
+            const chartElement = document.getElementById('{{ chart_id }}');
+            if (chartElement) {
+                const existingChart = Chart.getChart('{{ chart_id }}');
+                if (!existingChart) {
+                    constructChartInstance();
+                }
+            }
+        }
+
+        // Ensure chart creation based on DOM readiness
+        function createChartOnDOMState() {
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initializeIfReady);
+                // If the DOM is still loading, wait for it to be ready before creating the chart
+                document.addEventListener('DOMContentLoaded', createChartIfNeeded);
             } else {
-                initializeIfReady();
+                // If the DOM is already loaded, (re)create the chart immediately
+                createChartIfNeeded();
             }
         }
 
-        // Initialize on load
-        handleInitialization();
+        // Set up initialization
+        createChartOnDOMState();
 
-        // Initialize after HTMX swap
-        document.addEventListener('htmx:afterSwap', initializeIfReady);
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id === '{{ chart_id }}') {
+                createChartIfNeeded();
+            }
+        });
     })();
 </script>

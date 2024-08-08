@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from .utils import process_csv, clean_euro_value
 import json
 import pandas as pd
+import random
 
 # Create your views here.
 def view_home(request):
@@ -76,6 +77,7 @@ def test_chart(request):
     
     context = {
         'csv_file': csv_file,
+        'chart_id': f'test_chart_{random.randint(0, 1000000)}',
         'index': index,
         'series': [series1, series2],
         'series_labels': series_labels,

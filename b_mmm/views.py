@@ -48,8 +48,8 @@ def view_preview(request, file_id=None):
     # Read the CSV file
     df = csv_file.get_data()
     currency = csv_file.get_currency()
-    index = csv_file.get_index().tolist() # values for the x-axis
-    sales = csv_file.get_sales().tolist()
+    index = csv_file.get_index() # values for the x-axis
+    sales = csv_file.get_sales()
     predictors = csv_file.get_predictors()
     predictor_names = csv_file.get_predictor_names()
     predictor_currencies = csv_file.get_predictor_currencies()
@@ -61,9 +61,9 @@ def view_preview(request, file_id=None):
         
         chart_data = {
             'chart_id': f'chart_{i}',
-            'index': index,
-            'series': [sales, predictor.tolist()],
-            'series_labels': [df.columns[1], predictor_names[i]],
+            'index': index.tolist(),
+            'series': [sales.tolist(), predictor.tolist()],
+            'series_labels': ['Sales', predictor_names[i]],
             'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],
             'y_label_left': 'Sales',
             'y_label_right': 'Value',

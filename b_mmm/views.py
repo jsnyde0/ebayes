@@ -7,7 +7,8 @@ from django.http import HttpResponseForbidden, FileResponse
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
-from .utils import process_csv, clean_currency_values, load_and_preprocess_csv
+from .utils import clean_currency_values, load_and_preprocess_csv
+from .models import process_csv
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import pandas as pd
@@ -46,15 +47,15 @@ def view_preview(request, file_id=None):
     
     # Read the CSV file
     df = csv_file.get_data()
+    currency = csv_file.get_currency()
     index = csv_file.get_index().tolist() # values for the x-axis
-    sales, sales_currency = clean_currency_values(df.iloc[:, 1])
-    sales = sales.tolist()
+    sales = csv_file.get_sales().tolist()
     
     # Create a chart for each predictor against the sales
     charts_data = []
     for i, predictor_col in enumerate(df.columns[2:], start=1):
         # Check for currency symbol in the predictor column and clean it up
-        predictor, predictor_currency = clean_currency_values(df[predictor_col], currency_symbols=[sales_currency])
+        predictor, predictor_currency = clean_currency_values(df[predictor_col], currency_symbols=[currency])
         
         chart_data = {
             'chart_id': f'chart_{i}',

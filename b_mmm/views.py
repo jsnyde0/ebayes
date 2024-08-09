@@ -98,19 +98,21 @@ def view_model(request):
         model_type = request.POST.get('model_type')
         
         csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
-        df = load_and_preprocess_csv(csv_file)
+        abt = load_and_preprocess_csv(csv_file)
         
         # index contains the dates
-        index = df.index.tolist()
+        index = abt.index
+        index_as_strings = index.strftime('%Y-%m-%d').tolist() # needed for the chart
         # 1st column is the sales
-        y_column = df.columns[0]
-        y = df[y_column]
+        y_column = abt.columns[0]
+        y = abt[y_column]
         print('y: \n', y.head())
         # all other columns are predictors
-        x_columns = df.columns[1:]
-        X = df[x_columns]
+        x_columns = abt.columns[1:]
+        X = abt[x_columns]
         print('X: \n', X.head())
         if model_type == 'linear_regression':
+            # Fit a linear regression model
             model = LinearRegression()
             model.fit(X, y)
 
@@ -121,13 +123,34 @@ def view_model(request):
 
             R_squared = round(model.score(X, y), 2)
             print(f'R Squared:  {R_squared}')
-            
+
+            # Make predictions
+            y_column_predicted = y_column + '_predicted'
+            # make predictions
+            abt[y_column_predicted] = model.predict(X)
+            ## convert to integers
+            abt[y_column_predicted] = round(abt[y_column_predicted], 2)
+            abt.head()
+
+            # Create a chart for the predicted values against the actual values
+            chart_data = {
+                'chart_id': 'chart_actual_vs_predicted',
+                'index': index_as_strings,
+                'series': [y.tolist(), abt[y_column_predicted].tolist()],
+                'series_labels': ['Actual', 'Predicted'],
+                'series_axes': ['y_left', 'y_left'],
+                'x_label': 'Date',
+                'y_label_left': 'Sales',
+                'y_unit_left': '€',
+            }
+
             context = {
                 'csv_files': csv_files,
                 'show_model_results': True,
                 'r_squared': R_squared,
                 'coefficients': dict(zip(x_columns, model_coefficients)),
                 'intercept': model_intercept,
+                'chart_data': chart_data
             }
             
             return render(request, 'mmm/model.html', context)

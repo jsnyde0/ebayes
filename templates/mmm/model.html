@@ -25,5 +25,33 @@
 
   {% if show_model_results %}
     <h2 class="mb-6 text-2xl">Model Results</h2>
+
+    <div id="results-container" class="grid grid-cols-2 gap-4">
+      {% comment %} <div class="mb-5">
+        <ul>
+          <li>chartId: {{ chart_data.chart_id }}</li>
+          <li>index: {{ chart_data.index }}</li>
+          <li>series: {{ chart_data.series }}</li>
+          <li>series_labels: {{ chart_data.series_labels }}</li>
+          <li>series_axes: {{ chart_data.series_axes }}</li>
+          <li>x_label: {{ chart_data.x_label }}</li>
+          <li>y_label_left: {{ chart_data.y_label_left }}</li>
+          <li>y_unit_left: {{ chart_data.y_unit_left }}</li>
+        </ul>
+      </div> {% endcomment %}
+      <div class="h-[400px] mb-5">
+        <c-line-chart 
+          chart_id="{{ chart_data.chart_id }}"  
+          :index="chart_data.index" 
+          :series="chart_data.series" 
+          :series_labels="chart_data.series_labels"
+          :series_axes="chart_data.series_axes"
+          x_label="{{ chart_data.x_label }}"
+          y_label_left="{{ chart_data.y_label_left }}"
+          y_unit_left="{{ chart_data.y_unit_left }}"
+          :colors="['rgb(50, 220, 160)', 'rgb(255, 99, 132)']"
+        />
+      </div>
+    </div>
   {% endif %}
 {% endblock main %}

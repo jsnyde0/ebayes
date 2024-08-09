@@ -20,5 +20,10 @@ class CSVFile(models.Model):
     sales_column = models.CharField(max_length=255, default='sales')
     predictor_columns = models.JSONField(default=list)  # List of predictor column names
 
+    class Meta:
+        verbose_name_plural = 'CSV Files'
+        verbose_name = 'CSV File'
+        ordering = ['-created_at']
+
     def __str__(self):
         return self.file_name

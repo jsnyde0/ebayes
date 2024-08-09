@@ -27,7 +27,10 @@ def process_csv(csv_file, user):
         if not headers:
             raise ValidationError("No headers found in the CSV file.")
         
-        csv_file_instance.column_names = headers
+        # set the first column as date
+        csv_file_instance.date_column = headers[0]
+        csv_file_instance.sales_column = headers[1]
+        csv_file_instance.predictor_columns = headers[2:]
         csv_file_instance.save()
         
         # Optionally, we can validate the data here. For example, check if all expected columns are present

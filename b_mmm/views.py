@@ -7,7 +7,7 @@ from django.http import HttpResponseForbidden, FileResponse
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
-from .utils import process_csv, clean_euro_value
+from .utils import process_csv, clean_currency_values
 import json
 import pandas as pd
 import random
@@ -42,28 +42,26 @@ def view_preview(request, file_id):
     
     # Read the CSV file
     df = pd.read_csv(csv_file.file.path)
-    index = df.iloc[:, 0].tolist()
-    sales = df.iloc[:, 1].apply(clean_euro_value).tolist()
+    index = df.iloc[:, 0].tolist() # values for the x-axis
+    sales, sales_currency = clean_currency_values(df.iloc[:, 1])
+    sales = sales.tolist()
     
     # Create a chart for each predictor against the sales
     charts_data = []
     for i, predictor_col in enumerate(df.columns[2:], start=1):
-        predictor_raw = df[predictor_col].tolist()
-        # if the predictor has a currency value, we plot it on the same y-axis as sales
-        predictor_has_currency = any('€' in str(value) for value in predictor_raw)
-        
-        predictor = df[predictor_col].apply(clean_euro_value if predictor_has_currency else float).tolist()
+        # Check for currency symbol in the predictor column and clean it up
+        predictor, predictor_currency = clean_currency_values(df[predictor_col], currency_symbols=[sales_currency])
         
         chart_data = {
             'chart_id': f'chart_{i}',
             'index': index,
-            'series': [sales, predictor],
+            'series': [sales, predictor.tolist()],
             'series_labels': [df.columns[1], predictor_col],
-            'series_axes': ['y_left', 'y_left' if predictor_has_currency else 'y_right'],
-            'y_label_left': 'Value',
+            'series_axes': ['y_left', 'y_left' if predictor_currency else 'y_right'],
+            'y_label_left': 'Sales',
             'y_label_right': 'Value',
             'y_unit_left': '€',
-            'y_unit_right': '€' if predictor_has_currency else '#'
+            'y_unit_right': predictor_currency if predictor_currency else '#'
         }
         charts_data.append(chart_data)
     
@@ -85,14 +83,14 @@ def view_preview(request, file_id):
     # }
     # sales = {
     #     'label': 'Sales',
-    #     'data': df.iloc[:, 1].apply(clean_euro_value).tolist(),
+    #     'data': df.iloc[:, 1].apply(clean_currency_value).tolist(),
     # }
     
     # predictors = []
     # for column in df.columns[2:]:  # Start from the third column
     #     predictors.append({
     #         'label': column,
-    #         'data': df[column].apply(clean_euro_value).tolist(),
+    #         'data': df[column].apply(clean_currency_value).tolist(),
     #     })
 
     # context = {
@@ -119,15 +117,15 @@ def test_chart(request):
     df = pd.read_csv(csv_file.file.path)
     # Prepare data for Chart.js
     index = df.iloc[:, 0].tolist()
-    series1 = df.iloc[:, 1].apply(clean_euro_value).tolist()
-    series2 = df.iloc[:, 2].apply(clean_euro_value).tolist()
+    series1, _ = clean_currency_values(df.iloc[:, 1])
+    series2, _ = clean_currency_values(df.iloc[:, 2])
     series_labels = df.columns[1:3].tolist()
     
     context = {
         'csv_file': csv_file,
         'chart_id': f'test_chart_{random.randint(0, 1000000)}',
         'index': index,
-        'series': [series1, series2],
+        'series': [series1.tolist(), series2.tolist()],
         'series_labels': series_labels,
         'x_label': 'Date',
         'y_label': 'Value',

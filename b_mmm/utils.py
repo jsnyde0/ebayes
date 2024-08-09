@@ -5,6 +5,13 @@ import numpy as np
 import csv
 import io
 
+def get_currency(values, currency_symbols=None):
+    currency_symbols = currency_symbols or ['€', '$', '£', '¥']
+    for symbol in currency_symbols:
+        if values.astype(str).str.contains(symbol).any():
+            return symbol
+    return None
+
 def process_csv(csv_file, user):
     csv_file_instance = CSVFile.objects.create(
         user=user, 
@@ -31,6 +38,12 @@ def process_csv(csv_file, user):
         csv_file_instance.date_column = headers[0]
         csv_file_instance.sales_column = headers[1]
         csv_file_instance.predictor_columns = headers[2:]
+
+        # we want to read the sales column and extract the currency
+        df = pd.read_csv(csv_file_instance.file.path)
+        sales_data = df[csv_file_instance.sales_column]
+        csv_file_instance.currency = get_currency(sales_data)
+        
         csv_file_instance.save()
         
         # Optionally, we can validate the data here. For example, check if all expected columns are present

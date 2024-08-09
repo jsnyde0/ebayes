@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import pandas as pd
 import uuid
 import os
 
@@ -19,6 +20,7 @@ class CSVFile(models.Model):
     date_column = models.CharField(max_length=255, default='date')
     sales_column = models.CharField(max_length=255, default='sales')
     predictor_columns = models.JSONField(default=list)  # List of predictor column names
+    currency = models.CharField(max_length=3, default='€')
 
     class Meta:
         verbose_name_plural = 'CSV Files'
@@ -27,3 +29,11 @@ class CSVFile(models.Model):
 
     def __str__(self):
         return self.file_name
+    
+    def get_data(self):
+        """Load the entire dataset"""
+        return pd.read_csv(self.file.path)
+    
+    def get_index(self):
+        """Get the index column"""
+        return self.get_data().index

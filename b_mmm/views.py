@@ -45,8 +45,8 @@ def view_preview(request, file_id=None):
         csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
     # Read the CSV file
-    df = pd.read_csv(csv_file.file.path)
-    index = df.iloc[:, 0].tolist() # values for the x-axis
+    df = csv_file.get_data()
+    index = csv_file.get_index().tolist() # values for the x-axis
     sales, sales_currency = clean_currency_values(df.iloc[:, 1])
     sales = sales.tolist()
     

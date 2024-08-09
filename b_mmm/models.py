@@ -14,9 +14,11 @@ class CSVFile(models.Model):
     file_name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to=get_file_path)
-    column_names = models.JSONField(null=True, blank=True)
+    
+    # columns
+    date_column = models.CharField(max_length=255, default='date')
+    sales_column = models.CharField(max_length=255, default='sales')
+    predictor_columns = models.JSONField(default=list)  # List of predictor column names
 
     def __str__(self):
         return self.file_name
-    
-

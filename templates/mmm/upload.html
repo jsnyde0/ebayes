@@ -2,6 +2,17 @@
 {% block main %}
   <h1 class="mb-6 text-3xl">Upload CSV</h1>
 
+  <div class="mb-6 p-4 bg-base-200 rounded-lg">
+    <h2 class="text-xl mb-2">CSV Format Requirements:</h2>
+    <ul class="list-disc list-inside">
+      <li>The first row should contain column names (e.g., date, sales, fb_adspend, email_clicks, ...)</li>
+      <li>The first column must contain dates in YYYY-MM-DD format</li>
+      <li>The second column should contain sales data with the currency symbol included</li>
+      <li>Any column representing monetary values should include the currency symbol</li>
+      <li>Use dot as decimal separator (e.g. 1000.00 or 1,000.00, not 1000,00 or 1.000,00)</li>
+    </ul>
+  </div>
+
   <form method="post" enctype="multipart/form-data" class="mb-6">
     {% csrf_token %}
     <div class="flex items-center justify-center w-full">

@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from .utils import clean_currency_values
+from .utils import clean_currency_values, get_currency
 import pandas as pd
 import uuid
 import os
@@ -48,13 +48,6 @@ class CSVFile(models.Model):
     def get_sales(self):
         sales, _ = clean_currency_values(self.get_data()[self.sales_column], currency_symbols=[self.currency])
         return sales
-
-def get_currency(values, currency_symbols=None):
-    currency_symbols = currency_symbols or ['€', '$', '£', '¥']
-    for symbol in currency_symbols:
-        if values.astype(str).str.contains(symbol).any():
-            return symbol
-    return None
 
 def process_csv(csv_file, user):
     csv_file_instance = CSVFile.objects.create(

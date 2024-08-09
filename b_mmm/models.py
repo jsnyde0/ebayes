@@ -55,7 +55,8 @@ class CSVFile(models.Model):
             self._data = pd.read_csv(self.file.path)
         return self._data
     
-    def get_index(self) -> pd.Index:
+    @property
+    def index(self) -> pd.Index:
         """Get the index column"""
         return self.data.index
 
@@ -63,18 +64,18 @@ class CSVFile(models.Model):
         """Get the currency used in the CSV file (derived from sales column)."""
         return self.currency
     
-    def get_sales(self) -> pd.Series:
+    @property
+    def sales(self) -> pd.Series:
         """Get cleaned sales data (without currency symbol and converted to float)."""
         sales, _ = clean_currency_values(self.data[self.sales_column], currency_symbols=[self.currency])
         return sales
     
     def get_predictors(self) -> List[pd.Series]:
         """Get cleaned predictor data."""
-        predictors = []
-        for i, predictor_column in enumerate(self.predictor_columns):
-            predictor, _ = clean_currency_values(self.data[predictor_column], currency_symbols=[self.currency])
-            predictors.append(predictor)
-        return predictors
+        return [
+            clean_currency_values(self.data[col], currency_symbols=[self.currency])[0]
+            for col in self.predictor_columns
+        ]
     
     def get_predictor_names(self) -> List[str]:
         """Get the names of the predictor columns."""

@@ -49,8 +49,8 @@ def view_preview(request, file_id=None):
     df = csv_file.data
     print(df.head())
     currency = csv_file.get_currency()
-    index = csv_file.get_index() # values for the x-axis
-    sales = csv_file.get_sales()
+    index = csv_file.index # values for the x-axis
+    sales = csv_file.sales
     predictors = csv_file.get_predictors()
     predictor_names = csv_file.get_predictor_names()
     predictor_currencies = csv_file.get_predictor_currencies()

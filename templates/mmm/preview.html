@@ -11,35 +11,22 @@
     sales.data: {{ sales_data }}
   </p>
   <div id="charts-container" class="grid grid-cols-2 gap-4">
-    <div class="h-[400px] mb-5">
-      <c-line-chart 
-        chart_id="{{ chart_id }}"  
-        :index="index" 
-        :series="series" 
-        :series_labels="series_labels"
-        :series_axes="['y_left', 'y_left']"
-        x_label="{{ x_label }}"
-        y_label_left="{{ y_label }}"
-        y_label_right="{{ y_label }}"
-        y_unit_left="{{ y_unit }}"
-        y_unit_right="{{ y_unit }}"
-        :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
-      />
-    </div>
-    {% comment %} {% for predictor in predictors %}
+    {% for chart in charts_data %}
       <div class="h-[400px] mb-5">
         <c-line-chart 
-          chart_id="chart-{{ forloop.counter }}"  
-          :index="{{ index_data|safe }}" 
-          :series="[{{ sales_data|safe }}, {{ predictor.data|safe }}]" 
-          :series_labels="['{{ sales_label }}', '{{ predictor.label }}']"
-          :series_axes="['y_left', 'y_left']"
-          x_label="{{ index_label }}"
-          y_label_left="Money"
-          y_unit_left="€"
+          chart_id="{{ chart.chart_id }}"  
+          :index="chart.index" 
+          :series="chart.series" 
+          :series_labels="chart.series_labels"
+          :series_axes="chart.series_axes"
+          x_label="{{ x_label }}"
+          y_label_left="{{ chart.y_label_left }}"
+          y_label_right="{{ chart.y_label_right }}"
+          y_unit_left="{{ chart.y_unit_left }}"
+          y_unit_right="{{ chart.y_unit_right }}"
           :colors="['rgb(75, 192, 192)', 'rgb(255, 99, 132)']"
         />
       </div>
-    {% endfor %} {% endcomment %}
+    {% endfor %}
   </div>
 {% endblock main %}

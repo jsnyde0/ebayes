@@ -42,19 +42,34 @@ def view_preview(request, file_id):
     
     # Read the CSV file
     df = pd.read_csv(csv_file.file.path)
-    # Prepare data for Chart.js
     index = df.iloc[:, 0].tolist()
     sales = df.iloc[:, 1].apply(clean_euro_value).tolist()
-    predictor = df.iloc[:, 2].apply(clean_euro_value).tolist()
-    series = [sales, predictor]
-    series_labels = df.columns[1:3].tolist()
+    
+    # Create a chart for each predictor against the sales
+    charts_data = []
+    for i, predictor_col in enumerate(df.columns[2:], start=1):
+        predictor_raw = df[predictor_col].tolist()
+        # if the predictor has a currency value, we plot it on the same y-axis as sales
+        predictor_has_currency = any('€' in str(value) for value in predictor_raw)
+        
+        predictor = df[predictor_col].apply(clean_euro_value if predictor_has_currency else float).tolist()
+        
+        chart_data = {
+            'chart_id': f'chart_{i}',
+            'index': index,
+            'series': [sales, predictor],
+            'series_labels': [df.columns[1], predictor_col],
+            'series_axes': ['y_left', 'y_left' if predictor_has_currency else 'y_right'],
+            'y_label_left': 'Value',
+            'y_label_right': 'Value',
+            'y_unit_left': '€',
+            'y_unit_right': '€' if predictor_has_currency else '#'
+        }
+        charts_data.append(chart_data)
     
     context = {
         'csv_file': csv_file,
-        'chart_id': f'test_chart_{random.randint(0, 1000000)}',
-        'index': index,
-        'series': series,
-        'series_labels': series_labels,
+        'charts_data': charts_data,
         'x_label': 'Date',
         'y_label': 'Value',
         'y_unit': '€'

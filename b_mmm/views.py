@@ -7,10 +7,10 @@ from django.http import HttpResponseForbidden, FileResponse
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
-from .utils import process_csv, clean_currency_values
-import json
+from .utils import process_csv, clean_currency_values, load_and_preprocess_csv
+from sklearn.linear_model import LinearRegression
 import pandas as pd
-import random
+import pandas as pd
 
 # Create your views here.
 def view_home(request):
@@ -91,4 +91,45 @@ def serve_csv(request, file_id):
 
 @login_required
 def view_model(request):
-    return render(request, 'mmm/model.html')
+    csv_files = CSVFile.objects.filter(user=request.user).order_by('-created_at')
+
+    if request.method == 'POST':
+        file_id = request.POST.get('file_id')
+        model_type = request.POST.get('model_type')
+        
+        csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
+        df = load_and_preprocess_csv(csv_file)
+        
+        # index contains the dates
+        index = df.index.tolist()
+        # 1st column is the sales
+        y_column = df.columns[0]
+        y = df[y_column]
+        print('y: \n', y.head())
+        # all other columns are predictors
+        x_columns = df.columns[1:]
+        X = df[x_columns]
+        print('X: \n', X.head())
+        if model_type == 'linear_regression':
+            model = LinearRegression()
+            model.fit(X, y)
+
+            model_coefficients = model.coef_
+            model_intercept = model.intercept_
+            print('model coefficients: ', model_coefficients)
+            print('model intercept: ', model_intercept)
+
+            R_squared = round(model.score(X, y), 2)
+            print(f'R Squared:  {R_squared}')
+            
+            context = {
+                'csv_files': csv_files,
+                'show_model_results': True,
+                'r_squared': R_squared,
+                'coefficients': dict(zip(x_columns, model_coefficients)),
+                'intercept': model_intercept,
+            }
+            
+            return render(request, 'mmm/model.html', context)
+    
+    return render(request, 'mmm/model.html', {'csv_files': csv_files})

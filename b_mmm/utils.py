@@ -100,3 +100,12 @@ def clean_currency_values(values, currency_symbols=None):
     cleaned = pd.to_numeric(cleaned, errors='coerce')
     
     return cleaned, found_currency
+
+def load_and_preprocess_csv(csv_file):
+    df = pd.read_csv(csv_file.file.path)
+    date_column = df.columns[0]
+    df[date_column] = pd.to_datetime(df[date_column])
+    for col in df.columns[1:3]:
+        df[col], _ = clean_currency_values(df[col])
+    df.set_index(date_column, inplace=True)
+    return df

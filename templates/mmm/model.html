@@ -1,8 +1,29 @@
 {% extends "layouts/default.html" %}
 {% block main %}
-  <h1 class="mb-6 text-3xl">Model Your Data</h1>
+  <h1 class="mb-6 text-3xl">Model Config & Inference</h1>
 
-  <div id="charts-container" class="grid grid-cols-2 gap-4">
-    Not sure yet what to put here.
-  </div>
+  <h2 class="mb-6 text-2xl"> Model Configuration </h2>
+
+  <form method="post" class="mb-6">
+    {% csrf_token %}
+    <div class="mb-4">
+      <label for="file_id" class="block text-sm font-medium text-gray-700">Select CSV File</label>
+      <select id="file_id" name="file_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        {% for file in csv_files %}
+          <option value="{{ file.id }}">{{ file.file_name }} ({{ file.created_at|date:"Y-m-d H:i" }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label for="model_type" class="block text-sm font-medium text-gray-700">Select Model Type</label>
+      <select id="model_type" name="model_type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        <option value="linear_regression">Linear Regression</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Run Model</button>
+  </form>
+
+  {% if show_model_results %}
+    <h2 class="mb-6 text-2xl">Model Results</h2>
+  {% endif %}
 {% endblock main %}

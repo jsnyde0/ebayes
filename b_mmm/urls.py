@@ -10,4 +10,5 @@ urlpatterns = [
     path('preview/', views.view_preview, name='preview'),
     path('csv/<uuid:file_id>/', views.serve_csv, name='serve_csv'),
     path('preview/<uuid:file_id>/', views.view_preview, name='preview'),
+    path('model/', views.view_model, name='model'),
 ]

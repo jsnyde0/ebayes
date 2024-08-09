@@ -88,3 +88,7 @@ def serve_csv(request, file_id):
     response = FileResponse(csv_file.file, content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{csv_file.file_name}"'
     return response
+
+@login_required
+def view_model(request):
+    return render(request, 'mmm/model.html')

@@ -39,8 +39,8 @@
             <li>
                 <button type="button"
                         class="flex items-center p-2 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300"
-                        aria-controls="dropdown-pages"
-                        data-collapse-toggle="dropdown-pages">
+                        aria-controls="dropdown-data"
+                        data-collapse-toggle="dropdown-data">
                     <svg aria-hidden="true"
                          class="flex-shrink-0 w-6 h-6 text-base-content transition duration-75 group-hover:text-base-content dark:text-gray-400 dark:group-hover:text-base-100"
                          fill="currentColor"
@@ -59,7 +59,7 @@
                         </path>
                     </svg>
                 </button>
-                <ul id="dropdown-pages" class="py-2 space-y-2">
+                <ul id="dropdown-data" class="py-2 space-y-2">
                     <li>
                         <a href="{% url 'mmm:upload' %}"
                            class="flex items-center p-2 pl-11 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300">Upload</a>
@@ -77,8 +77,8 @@
             <li>
                 <button type="button"
                         class="flex items-center p-2 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300"
-                        aria-controls="dropdown-sales"
-                        data-collapse-toggle="dropdown-sales">
+                        aria-controls="dropdown-model"
+                        data-collapse-toggle="dropdown-model">
                     <svg aria-hidden="true"
                          class="flex-shrink-0 w-6 h-6 text-base-content transition duration-75 group-hover:text-base-content dark:text-gray-400 dark:group-hover:text-base-100"
                          fill="currentColor"
@@ -87,7 +87,7 @@
                         <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd">
                         </path>
                     </svg>
-                    <span class="flex-1 ml-3 text-left whitespace-nowrap">Sales</span>
+                    <span class="flex-1 ml-3 text-left whitespace-nowrap">Model</span>
                     <svg aria-hidden="true"
                          class="w-6 h-6"
                          fill="currentColor"
@@ -97,19 +97,19 @@
                         </path>
                     </svg>
                 </button>
-                <ul id="dropdown-sales" class="hidden py-2 space-y-2">
+                <ul id="dropdown-model" class="py-2 space-y-2">
                     <li>
-                        <a href="#"
-                           class="flex items-center p-2 pl-11 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300">Products</a>
+                        <a href="{% url 'mmm:model' %}"
+                           class="flex items-center p-2 pl-11 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300">Model</a>
                     </li>
-                    <li>
+                    {% comment %} <li>
                         <a href="#"
                            class="flex items-center p-2 pl-11 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300">Billing</a>
                     </li>
                     <li>
                         <a href="#"
                            class="flex items-center p-2 pl-11 w-full text-base font-medium text-base-content rounded-lg transition duration-75 group hover:bg-base-200 dark:text-base-100 dark:hover:bg-base-300">Invoice</a>
-                    </li>
+                    </li> {% endcomment %}
                 </ul>
             </li>
             <li>

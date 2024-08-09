@@ -46,7 +46,8 @@ def view_preview(request, file_id=None):
         csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
     # Read the CSV file
-    df = csv_file.get_data()
+    df = csv_file.data
+    print(df.head())
     currency = csv_file.get_currency()
     index = csv_file.get_index() # values for the x-axis
     sales = csv_file.get_sales()

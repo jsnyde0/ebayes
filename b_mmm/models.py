@@ -7,7 +7,7 @@ import csv
 import io
 import os
 import uuid
-from typing import List, Tuple
+from typing import List, Optional
 
 from .utils import clean_currency_values, get_currency
 
@@ -35,7 +35,10 @@ class CSVFile(models.Model):
     sales_column = models.CharField(max_length=255, default='sales')
     predictor_columns = models.JSONField(default=list)  # List of predictor column names
     predictor_currencies = models.JSONField(default=list)  # List of predictor currencies
-    currency = models.CharField(max_length=3, default='€')
+    currency = models.CharField(max_length=3, default=DEFAULT_CURRENCY)
+
+    # _data is for internal use only and can be either a pandas DataFrame or None. Optional is equivalent to Union[pd.DataFrame, None]
+    _data: Optional[pd.DataFrame] = None
 
     class Meta:
         verbose_name_plural = 'CSV Files'
@@ -45,13 +48,16 @@ class CSVFile(models.Model):
     def __str__(self) -> str:
         return self.file_name
     
-    def get_data(self) -> pd.DataFrame:
-        """Load the entire dataset"""
-        return pd.read_csv(self.file.path)
+    @property
+    def data(self) -> pd.DataFrame:
+        """Lazy load the dataset."""
+        if self._data is None:
+            self._data = pd.read_csv(self.file.path)
+        return self._data
     
     def get_index(self) -> pd.Index:
         """Get the index column"""
-        return self.get_data().index
+        return self.data.index
 
     def get_currency(self) -> str:
         """Get the currency used in the CSV file (derived from sales column)."""
@@ -59,14 +65,14 @@ class CSVFile(models.Model):
     
     def get_sales(self) -> pd.Series:
         """Get cleaned sales data (without currency symbol and converted to float)."""
-        sales, _ = clean_currency_values(self.get_data()[self.sales_column], currency_symbols=[self.currency])
+        sales, _ = clean_currency_values(self.data[self.sales_column], currency_symbols=[self.currency])
         return sales
     
     def get_predictors(self) -> List[pd.Series]:
         """Get cleaned predictor data."""
         predictors = []
         for i, predictor_column in enumerate(self.predictor_columns):
-            predictor, _ = clean_currency_values(self.get_data()[predictor_column], currency_symbols=[self.currency])
+            predictor, _ = clean_currency_values(self.data[predictor_column], currency_symbols=[self.currency])
             predictors.append(predictor)
         return predictors
     

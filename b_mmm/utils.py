@@ -4,7 +4,7 @@ import numpy as np
 def get_currency(values, currency_symbols=None):
     currency_symbols = currency_symbols or ['€', '$', '£', '¥']
     for symbol in currency_symbols:
-        if values.astype(str).str.contains(symbol).any():
+        if values.astype(str).str.contains(symbol, regex=False).any():
             return symbol
     return None
 
@@ -50,7 +50,7 @@ def clean_currency_values(values, currency_symbols=None):
     # Detect currency symbol if not provided
     found_currency = None
     for symbol in currency_symbols:
-        if values.astype(str).str.contains(symbol).any():
+        if values.astype(str).str.contains(symbol, regex=False).any():
             found_currency = symbol
             break
     

@@ -24,6 +24,7 @@ class CSVFile(models.Model):
     date_column = models.CharField(max_length=255, default='date')
     sales_column = models.CharField(max_length=255, default='sales')
     predictor_columns = models.JSONField(default=list)  # List of predictor column names
+    predictor_currencies = models.JSONField(default=list)  # List of predictor currencies
     currency = models.CharField(max_length=3, default='€')
 
     class Meta:
@@ -48,6 +49,19 @@ class CSVFile(models.Model):
     def get_sales(self):
         sales, _ = clean_currency_values(self.get_data()[self.sales_column], currency_symbols=[self.currency])
         return sales
+    
+    def get_predictors(self):
+        predictors = []
+        for i, predictor_column in enumerate(self.predictor_columns):
+            predictor, _ = clean_currency_values(self.get_data()[predictor_column], currency_symbols=[self.currency])
+            predictors.append(predictor)
+        return predictors
+    
+    def get_predictor_names(self):
+        return self.predictor_columns
+    
+    def get_predictor_currencies(self):
+        return self.predictor_currencies
 
 def process_csv(csv_file, user):
     csv_file_instance = CSVFile.objects.create(
@@ -80,6 +94,11 @@ def process_csv(csv_file, user):
         df = pd.read_csv(csv_file_instance.file.path)
         sales_data = df[csv_file_instance.sales_column]
         csv_file_instance.currency = get_currency(sales_data)
+
+        # get the predictor currencies
+        predictor_data = df[csv_file_instance.predictor_columns]
+        predictor_currencies = [get_currency(predictor_data[col]) for col in predictor_data.columns]
+        csv_file_instance.predictor_currencies = predictor_currencies
         
         csv_file_instance.save()
         

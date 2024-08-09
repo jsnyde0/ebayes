@@ -50,23 +50,25 @@ def view_preview(request, file_id=None):
     currency = csv_file.get_currency()
     index = csv_file.get_index().tolist() # values for the x-axis
     sales = csv_file.get_sales().tolist()
-    
+    predictors = csv_file.get_predictors()
+    predictor_names = csv_file.get_predictor_names()
+    predictor_currencies = csv_file.get_predictor_currencies()
+
     # Create a chart for each predictor against the sales
     charts_data = []
-    for i, predictor_col in enumerate(df.columns[2:], start=1):
+    for i, predictor in enumerate(predictors):
         # Check for currency symbol in the predictor column and clean it up
-        predictor, predictor_currency = clean_currency_values(df[predictor_col], currency_symbols=[currency])
         
         chart_data = {
             'chart_id': f'chart_{i}',
             'index': index,
             'series': [sales, predictor.tolist()],
-            'series_labels': [df.columns[1], predictor_col],
-            'series_axes': ['y_left', 'y_left' if predictor_currency else 'y_right'],
+            'series_labels': [df.columns[1], predictor_names[i]],
+            'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],
             'y_label_left': 'Sales',
             'y_label_right': 'Value',
             'y_unit_left': '€',
-            'y_unit_right': predictor_currency if predictor_currency else '#'
+            'y_unit_right': predictor_currencies[i] if predictor_currencies[i] else '#'
         }
         charts_data.append(chart_data)
     

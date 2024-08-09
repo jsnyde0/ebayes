@@ -84,54 +84,55 @@ class CSVFile(models.Model):
     def get_predictor_currencies(self) -> List[str]:
         """Get the currencies used in predictor columns."""
         return self.predictor_currencies
+    
+    @classmethod
+    def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile':
+        """Process the uploaded CSV file and create a CSVFile instance."""
+        csv_file_instance = CSVFile.objects.create(
+            user=user, 
+            file_name=csv_file.name, 
+            file=csv_file
+        )
 
-def process_csv(csv_file: 'UploadedFile', user: User) -> CSVFile:
-    """Process the uploaded CSV file and create a CSVFile instance."""
-    csv_file_instance = CSVFile.objects.create(
-        user=user, 
-        file_name=csv_file.name, 
-        file=csv_file
-    )
+        try:
+            csv_file.seek(0)  # Ensure we're at the start of the file
+            content = csv_file.read().decode('utf-8')
+            csv_file.seek(0) 
+            
+            reader = csv.DictReader(io.StringIO(content))
+            headers = reader.fieldnames
+            
+            if not headers:
+                raise ValidationError("No headers found in the CSV file.")
+            
+            csv_file_instance.date_column = headers[0]
+            csv_file_instance.sales_column = headers[1]
+            csv_file_instance.predictor_columns = headers[2:]
 
-    try:
-        csv_file.seek(0)  # Ensure we're at the start of the file
-        content = csv_file.read().decode('utf-8')
-        csv_file.seek(0) 
-        
-        reader = csv.DictReader(io.StringIO(content))
-        headers = reader.fieldnames
-        
-        if not headers:
-            raise ValidationError("No headers found in the CSV file.")
-        
-        csv_file_instance.date_column = headers[0]
-        csv_file_instance.sales_column = headers[1]
-        csv_file_instance.predictor_columns = headers[2:]
+            # we want to read the sales column and extract the currency
+            df = pd.read_csv(csv_file_instance.file.path)
+            csv_file_instance.currency = get_currency(df[csv_file_instance.sales_column])
 
-        # we want to read the sales column and extract the currency
-        df = pd.read_csv(csv_file_instance.file.path)
-        csv_file_instance.currency = get_currency(df[csv_file_instance.sales_column])
-
-        # get the predictor currencies
-        predictor_data = df[csv_file_instance.predictor_columns]
-        csv_file_instance.predictor_currencies = [
-            get_currency(predictor_data[col]) for col in predictor_data.columns
-        ]
-        
-        csv_file_instance.save()
-        
-        # Optionally, we can validate the data here. For example, check if all expected columns are present
-        # expected_columns = ['date', 'revenue', 'fb_spend', 'email_clicks', 'search_clicks']
-        # if not all(col in headers for col in expected_columns):
-        #     raise ValidationError("CSV is missing one or more required columns.")
-        
-        return csv_file_instance
-    except csv.Error as e:
-        csv_file_instance.delete()  # Clean up on failure
-        raise ValidationError(f'CSV parsing error: {str(e)}')
-    except Exception as e:
-        csv_file_instance.delete()  # Clean up on failure
-        raise ValidationError(f'Error processing CSV: {str(e)}')
+            # get the predictor currencies
+            predictor_data = df[csv_file_instance.predictor_columns]
+            csv_file_instance.predictor_currencies = [
+                get_currency(predictor_data[col]) for col in predictor_data.columns
+            ]
+            
+            csv_file_instance.save()
+            
+            # Optionally, we can validate the data here. For example, check if all expected columns are present
+            # expected_columns = ['date', 'revenue', 'fb_spend', 'email_clicks', 'search_clicks']
+            # if not all(col in headers for col in expected_columns):
+            #     raise ValidationError("CSV is missing one or more required columns.")
+            
+            return csv_file_instance
+        except csv.Error as e:
+            csv_file_instance.delete()  # Clean up on failure
+            raise ValidationError(f'CSV parsing error: {str(e)}')
+        except Exception as e:
+            csv_file_instance.delete()  # Clean up on failure
+            raise ValidationError(f'Error processing CSV: {str(e)}')
 
 
 

@@ -7,8 +7,7 @@ from django.http import HttpResponseForbidden, FileResponse
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
-from .utils import clean_currency_values, load_and_preprocess_csv
-from .models import process_csv
+from .utils import load_and_preprocess_csv
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import pandas as pd
@@ -26,7 +25,7 @@ def view_upload(request):
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                csv_file: CSVFile = process_csv(form.cleaned_data['csv_file'], request.user)
+                csv_file: CSVFile = CSVFile.create_from_csv(form.cleaned_data['csv_file'], request.user)
                 messages.success(request, f'CSV file "{csv_file.file_name}" uploaded successfully.')
             except ValidationError as e:
                 messages.error(request, str(e))

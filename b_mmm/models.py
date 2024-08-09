@@ -1,19 +1,29 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from .utils import clean_currency_values, get_currency
+
 import pandas as pd
-import uuid
-import os
 import csv
 import io
+import os
+import uuid
+from typing import List, Tuple
 
-def get_file_path(instance, filename):
+from .utils import clean_currency_values, get_currency
+
+# Constants
+DEFAULT_CURRENCY = '€'
+CSV_UPLOAD_DIR = 'csv_files'
+
+def get_file_path(instance: 'CSVFile', filename: str) -> str:
+    """Generate a unique file path for uploaded CSV files."""
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join('csv_files', filename)
+    return os.path.join(CSV_UPLOAD_DIR, filename)
 
 class CSVFile(models.Model):
+    """Model to store and process uploaded CSV files in a format handy for MMM."""
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     file_name = models.CharField(max_length=255)
@@ -32,38 +42,44 @@ class CSVFile(models.Model):
         verbose_name = 'CSV File'
         ordering = ['-created_at']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.file_name
     
-    def get_data(self):
+    def get_data(self) -> pd.DataFrame:
         """Load the entire dataset"""
         return pd.read_csv(self.file.path)
     
-    def get_index(self):
+    def get_index(self) -> pd.Index:
         """Get the index column"""
         return self.get_data().index
-    
-    def get_currency(self):
+
+    def get_currency(self) -> str:
+        """Get the currency used in the CSV file (derived from sales column)."""
         return self.currency
     
-    def get_sales(self):
+    def get_sales(self) -> pd.Series:
+        """Get cleaned sales data (without currency symbol and converted to float)."""
         sales, _ = clean_currency_values(self.get_data()[self.sales_column], currency_symbols=[self.currency])
         return sales
     
-    def get_predictors(self):
+    def get_predictors(self) -> List[pd.Series]:
+        """Get cleaned predictor data."""
         predictors = []
         for i, predictor_column in enumerate(self.predictor_columns):
             predictor, _ = clean_currency_values(self.get_data()[predictor_column], currency_symbols=[self.currency])
             predictors.append(predictor)
         return predictors
     
-    def get_predictor_names(self):
+    def get_predictor_names(self) -> List[str]:
+        """Get the names of the predictor columns."""
         return self.predictor_columns
     
-    def get_predictor_currencies(self):
+    def get_predictor_currencies(self) -> List[str]:
+        """Get the currencies used in predictor columns."""
         return self.predictor_currencies
 
-def process_csv(csv_file, user):
+def process_csv(csv_file: 'UploadedFile', user: User) -> CSVFile:
+    """Process the uploaded CSV file and create a CSVFile instance."""
     csv_file_instance = CSVFile.objects.create(
         user=user, 
         file_name=csv_file.name, 
@@ -71,34 +87,29 @@ def process_csv(csv_file, user):
     )
 
     try:
-        # Read the first few lines to get column names and validate
         csv_file.seek(0)  # Ensure we're at the start of the file
         content = csv_file.read().decode('utf-8')
-        csv_file.seek(0)  # Reset file pointer
+        csv_file.seek(0) 
         
-        # Use DictReader to handle the CSV
         reader = csv.DictReader(io.StringIO(content))
-        
-        # Get the fieldnames (headers)
         headers = reader.fieldnames
         
         if not headers:
             raise ValidationError("No headers found in the CSV file.")
         
-        # set the first column as date
         csv_file_instance.date_column = headers[0]
         csv_file_instance.sales_column = headers[1]
         csv_file_instance.predictor_columns = headers[2:]
 
         # we want to read the sales column and extract the currency
         df = pd.read_csv(csv_file_instance.file.path)
-        sales_data = df[csv_file_instance.sales_column]
-        csv_file_instance.currency = get_currency(sales_data)
+        csv_file_instance.currency = get_currency(df[csv_file_instance.sales_column])
 
         # get the predictor currencies
         predictor_data = df[csv_file_instance.predictor_columns]
-        predictor_currencies = [get_currency(predictor_data[col]) for col in predictor_data.columns]
-        csv_file_instance.predictor_currencies = predictor_currencies
+        csv_file_instance.predictor_currencies = [
+            get_currency(predictor_data[col]) for col in predictor_data.columns
+        ]
         
         csv_file_instance.save()
         

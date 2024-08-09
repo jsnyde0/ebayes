@@ -12,7 +12,7 @@ class CSVFile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     file_name = models.CharField(max_length=255)
-    upload_date = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to=get_file_path)
     column_names = models.JSONField(null=True, blank=True)
 

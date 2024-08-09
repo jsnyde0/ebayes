@@ -37,8 +37,12 @@ def view_upload(request):
     return render(request, 'mmm/upload.html')
 
 @login_required
-def view_preview(request, file_id):
-    csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
+def view_preview(request, file_id=None):
+    if file_id is None:
+        # get the latest file uploaded by the user
+        csv_file = CSVFile.objects.filter(user=request.user).order_by('-created_at').first()
+    else:
+        csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
     # Read the CSV file
     df = pd.read_csv(csv_file.file.path)
@@ -74,67 +78,6 @@ def view_preview(request, file_id):
     }
     
     return render(request, 'mmm/preview.html', context)
-
-    
-    # Prepare data for Chart.js
-    # index = {
-    #     'label': 'Date',
-    #     'data': df.iloc[:, 0].tolist(),
-    # }
-    # sales = {
-    #     'label': 'Sales',
-    #     'data': df.iloc[:, 1].apply(clean_currency_value).tolist(),
-    # }
-    
-    # predictors = []
-    # for column in df.columns[2:]:  # Start from the third column
-    #     predictors.append({
-    #         'label': column,
-    #         'data': df[column].apply(clean_currency_value).tolist(),
-    #     })
-
-    # context = {
-    #     'csv_file': csv_file,
-    #     'index_data': json.dumps(index['data']),
-    #     'index_label': index['label'],
-    #     'sales_data': json.dumps(sales['data']),
-    #     'sales_label': sales['label'],
-    #     'predictors': [
-    #         {
-    #             'label': p['label'],
-    #             'data': json.dumps(p['data'])
-    #         } for p in predictors
-    #     ],
-    # }
-    
-    # return render(request, 'mmm/preview.html', context)
-
-@login_required
-def test_chart(request):
-    csv_id = "419877a8-25b2-484f-a327-0b6863175bf6"
-    csv_file = get_object_or_404(CSVFile, id=csv_id, user=request.user)
-
-    df = pd.read_csv(csv_file.file.path)
-    # Prepare data for Chart.js
-    index = df.iloc[:, 0].tolist()
-    series1, _ = clean_currency_values(df.iloc[:, 1])
-    series2, _ = clean_currency_values(df.iloc[:, 2])
-    series_labels = df.columns[1:3].tolist()
-    
-    context = {
-        'csv_file': csv_file,
-        'chart_id': f'test_chart_{random.randint(0, 1000000)}',
-        'index': index,
-        'series': [series1.tolist(), series2.tolist()],
-        'series_labels': series_labels,
-        'x_label': 'Date',
-        'y_label': 'Value',
-        'y_unit': '€'
-    }
-    if request.htmx:
-        return render(request, 'partials/line_chart.html', context)
-    
-    return render(request, 'mmm/test_chart.html', context)
     
 @login_required
 def serve_csv(request, file_id):

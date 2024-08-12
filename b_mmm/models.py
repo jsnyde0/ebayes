@@ -52,6 +52,7 @@ class CSVFile(models.Model):
         """Lazy load the dataset."""
         if self._data is None:
             self._data = pd.read_csv(self.file.path)
+            self._data.set_index(self.date_column, inplace=True)
         return self._data
     
     @property
@@ -95,12 +96,12 @@ class CSVFile(models.Model):
         )[0]
     
     @property
-    def predictors(self) -> List[pd.Series]:
+    def predictors(self) -> pd.DataFrame:
         """Get cleaned predictor data."""
-        return [
-            clean_currency_values(self.data[col], currency_symbols=[self.get_predictor_currency(col)])[0]
+        return pd.DataFrame({
+            col: clean_currency_values(self.data[col], currency_symbols=[self.get_predictor_currency(col)])[0]
             for col in self.predictor_columns
-        ]
+        })
     
     @property
     def predictor_names(self) -> List[str]:

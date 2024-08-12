@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, get_object_or_404
-from django.http import HttpResponseForbidden, FileResponse
+from django.http import HttpResponseForbidden, FileResponse, Http404
 from .forms import CSVUploadForm
 from .models import CSVFile
 from django.core.exceptions import ValidationError
@@ -48,19 +48,18 @@ def view_preview(request, file_id=None):
     index = csv_file.index # values for the x-axis
     sales = csv_file.sales
     predictors = csv_file.predictors
-    predictor_names = csv_file.predictor_names
     predictor_currencies = csv_file.predictor_currencies
 
     # Create a chart for each predictor against the sales
     charts_data = []
-    for i, predictor in enumerate(predictors):
+    for i, (predictor_name, predictor) in enumerate(predictors.items()):
         # Check for currency symbol in the predictor column and clean it up
         
         chart_data = {
             'chart_id': f'chart_{i}',
             'index': index.tolist(),
             'series': [sales.tolist(), predictor.tolist()],
-            'series_labels': ['Sales', predictor_names[i]],
+            'series_labels': ['Sales', predictor_name],
             'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],
             'y_label_left': 'Sales',
             'y_label_right': '' if predictor_currencies[i] else 'Amount',
@@ -97,19 +96,22 @@ def view_model(request):
         file_id = request.POST.get('file_id')
         model_type = request.POST.get('model_type')
         
-        csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
-        abt = load_and_preprocess_csv(csv_file)
+        try:
+            csv_file = csv_files.get(id=file_id)
+        except CSVFile.DoesNotExist:
+            raise Http404("CSV file does not exist")
         
+        abt = csv_file.data
         # index contains the dates
-        index = abt.index
-        index_as_strings = index.strftime('%Y-%m-%d').tolist() # needed for the chart
+        index = csv_file.index
+        index_as_strings = index.tolist() # needed for the chart
         # 1st column is the sales
-        y_column = abt.columns[0]
-        y = abt[y_column]
+        y_column = csv_file.sales_column
+        y = csv_file.sales
         print('y: \n', y.head())
         # all other columns are predictors
-        x_columns = abt.columns[1:]
-        X = abt[x_columns]
+        x_columns = csv_file.predictor_columns
+        X = csv_file.predictors
         print('X: \n', X.head())
         if model_type == 'linear_regression':
             # Fit a linear regression model

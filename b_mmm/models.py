@@ -7,12 +7,12 @@ import csv
 import io
 import os
 import uuid
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
+from sklearn.linear_model import LinearRegression
 
 from .utils import clean_currency_values, get_currency
 
 # Constants
-DEFAULT_CURRENCY = '€'
 CSV_UPLOAD_DIR = 'csv_files'
 
 def get_file_path(instance: 'CSVFile', filename: str) -> str:
@@ -69,6 +69,7 @@ class CSVFile(models.Model):
                 self.sales_column: sales_currency,
                 **{col: predictor_currencies[i] for i, col in enumerate(self.predictor_columns)}
             }
+            self.save()
         return self.currencies
     
     @property
@@ -137,5 +138,42 @@ class CSVFile(models.Model):
         except Exception as e:
             raise ValidationError(f'Unexpected error processing CSV: {str(e)}')
 
+class MarketingMixModel(models.Model):
+    csv_file = models.ForeignKey(CSVFile, on_delete=models.CASCADE, related_name='mmm')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mmm')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    model_type = models.CharField(max_length=50)  # e.g., 'linear_regression', 'bayesian_mmm'
+    parameters = models.JSONField(default=dict)
+    results = models.JSONField(default=dict)
 
+    # _X: Optional[pd.DataFrame] = None
+    # _y: Optional[pd.Series] = None
+    # _model: Optional[LinearRegression] = None
+
+    def get_csv_file_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+        return self.csv_file.predictors, self.csv_file.sales
+
+    def run_model(self):
+        if self.model_type == 'linear_regression':
+            self._run_linear_regression()
+        elif self.model_type == 'bayesian_mmm':
+            self._run_bayesian_mmm()
+        self.save()
+
+    def _run_linear_regression(self):
+        X, y = self.get_csv_file_data()
+        model = LinearRegression()
+        model.fit(X, y)
+        
+        self.results = {
+            'r_squared': model.score(X, y),
+            'coefficients': dict(zip(X.columns, model.coef_)),
+            'intercept': model.intercept_,
+            'predictions': model.predict(X).tolist()
+        }
+
+    def _run_bayesian_mmm(self):
+        # Implement Bayesian MMM logic here
+        pass
 

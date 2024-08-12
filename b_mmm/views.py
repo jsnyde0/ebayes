@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, get_object_or_404
 from django.http import HttpResponseForbidden, FileResponse, Http404
 from .forms import CSVUploadForm
-from .models import CSVFile
+from .models import CSVFile, MarketingMixModel
 from django.core.exceptions import ValidationError
 from .utils import load_and_preprocess_csv
 from sklearn.linear_model import LinearRegression
@@ -101,6 +101,14 @@ def view_model(request):
         except CSVFile.DoesNotExist:
             raise Http404("CSV file does not exist")
         
+        mmm, created = MarketingMixModel.objects.get_or_create(
+            csv_file=csv_file,
+            user=request.user,
+            model_type=model_type
+        )
+
+        print('mmm created: ', created)
+
         abt = csv_file.data
         # index contains the dates
         index = csv_file.index
@@ -108,53 +116,49 @@ def view_model(request):
         # 1st column is the sales
         y_column = csv_file.sales_column
         y = csv_file.sales
-        print('y: \n', y.head())
         # all other columns are predictors
         x_columns = csv_file.predictor_columns
         X = csv_file.predictors
-        print('X: \n', X.head())
-        if model_type == 'linear_regression':
-            # Fit a linear regression model
-            model = LinearRegression()
-            model.fit(X, y)
 
-            model_coefficients = model.coef_
-            model_intercept = model.intercept_
-            print('model coefficients: ', model_coefficients)
-            print('model intercept: ', model_intercept)
+        mmm.run_model()
 
-            R_squared = round(model.score(X, y), 2)
-            print(f'R Squared:  {R_squared}')
+        model_coefficients = mmm.results['coefficients']
+        model_intercept = mmm.results['intercept']
+        print('model coefficients: ', model_coefficients)
+        print('model intercept: ', model_intercept)
 
-            # Make predictions
-            y_column_predicted = y_column + '_predicted'
-            # make predictions
-            abt[y_column_predicted] = model.predict(X)
-            ## convert to integers
-            abt[y_column_predicted] = round(abt[y_column_predicted], 2)
-            abt.head()
+        R_squared = mmm.results['r_squared']
+        print(f'R Squared:  {R_squared}')
 
-            # Create a chart for the predicted values against the actual values
-            chart_data = {
-                'chart_id': 'chart_actual_vs_predicted',
-                'index': index_as_strings,
-                'series': [y.tolist(), abt[y_column_predicted].tolist()],
-                'series_labels': ['Actual', 'Predicted'],
-                'series_axes': ['y_left', 'y_left'],
-                'x_label': 'Date',
-                'y_label_left': 'Sales',
-                'y_unit_left': '€',
-            }
+        # Make predictions
+        y_column_predicted = y_column + '_predicted'
+        # make predictions
+        abt[y_column_predicted] = mmm.results['predictions']
+        ## convert to integers
+        abt[y_column_predicted] = round(abt[y_column_predicted], 2)
+        abt.head()
 
-            context = {
-                'csv_files': csv_files,
-                'show_model_results': True,
-                'r_squared': R_squared,
-                'coefficients': dict(zip(x_columns, model_coefficients)),
-                'intercept': model_intercept,
-                'chart_data': chart_data
-            }
-            
-            return render(request, 'mmm/model.html', context)
+        # Create a chart for the predicted values against the actual values
+        chart_data = {
+            'chart_id': 'chart_actual_vs_predicted',
+            'index': index_as_strings,
+            'series': [y.tolist(), abt[y_column_predicted].tolist()],
+            'series_labels': ['Actual', 'Predicted'],
+            'series_axes': ['y_left', 'y_left'],
+            'x_label': 'Date',
+            'y_label_left': 'Sales',
+            'y_unit_left': '€',
+        }
+
+        context = {
+            'csv_files': csv_files,
+            'show_model_results': True,
+            'r_squared': R_squared,
+            'coefficients': dict(zip(x_columns, model_coefficients)),
+            'intercept': model_intercept,
+            'chart_data': chart_data
+        }
+        
+        return render(request, 'mmm/model.html', context)
     
     return render(request, 'mmm/model.html', {'csv_files': csv_files})

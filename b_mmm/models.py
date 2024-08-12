@@ -167,7 +167,7 @@ class MarketingMixModel(models.Model):
         model.fit(X, y)
         
         self.results = {
-            'r_squared': model.score(X, y),
+            'r_squared': round(model.score(X, y), 2),
             'coefficients': dict(zip(X.columns, model.coef_)),
             'intercept': model.intercept_,
             'predictions': model.predict(X).tolist()

@@ -46,13 +46,12 @@ def view_preview(request, file_id=None):
     
     # Read the CSV file
     df = csv_file.data
-    print(df.head())
-    currency = csv_file.get_currency()
+    currency = csv_file.currency
     index = csv_file.index # values for the x-axis
     sales = csv_file.sales
-    predictors = csv_file.get_predictors()
-    predictor_names = csv_file.get_predictor_names()
-    predictor_currencies = csv_file.get_predictor_currencies()
+    predictors = csv_file.predictors
+    predictor_names = csv_file.predictor_names
+    predictor_currencies = csv_file.predictor_currencies
 
     # Create a chart for each predictor against the sales
     charts_data = []

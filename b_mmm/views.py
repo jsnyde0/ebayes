@@ -107,19 +107,6 @@ def view_model(request):
             model_type=model_type
         )
 
-        print('mmm created: ', created)
-
-        abt = csv_file.data
-        # index contains the dates
-        index = csv_file.index
-        index_as_strings = index.tolist() # needed for the chart
-        # 1st column is the sales
-        y_column = csv_file.sales_column
-        y = csv_file.sales
-        # all other columns are predictors
-        x_columns = csv_file.predictor_columns
-        X = csv_file.predictors
-
         mmm.run_model()
 
         model_coefficients = mmm.results['coefficients']
@@ -130,31 +117,14 @@ def view_model(request):
         R_squared = mmm.results['r_squared']
         print(f'R Squared:  {R_squared}')
 
-        # Make predictions
-        y_column_predicted = y_column + '_predicted'
-        # make predictions
-        abt[y_column_predicted] = mmm.results['predictions']
-        ## convert to integers
-        abt[y_column_predicted] = round(abt[y_column_predicted], 2)
-        abt.head()
-
         # Create a chart for the predicted values against the actual values
-        chart_data = {
-            'chart_id': 'chart_actual_vs_predicted',
-            'index': index_as_strings,
-            'series': [y.tolist(), abt[y_column_predicted].tolist()],
-            'series_labels': ['Actual', 'Predicted'],
-            'series_axes': ['y_left', 'y_left'],
-            'x_label': 'Date',
-            'y_label_left': 'Sales',
-            'y_unit_left': '€',
-        }
+        chart_data = mmm.create_chart_actual_vs_predicted()
 
         context = {
             'csv_files': csv_files,
             'show_model_results': True,
             'r_squared': R_squared,
-            'coefficients': dict(zip(x_columns, model_coefficients)),
+            'coefficients': dict(zip(csv_file.predictor_columns, model_coefficients)),
             'intercept': model_intercept,
             'chart_data': chart_data
         }

@@ -173,6 +173,20 @@ class MarketingMixModel(models.Model):
             'predictions': model.predict(X).tolist()
         }
 
+    # function that creates the chart data for the predicted values against the actual values
+    def create_chart_actual_vs_predicted(self):
+        chart_data = {
+            'chart_id': 'chart_actual_vs_predicted',
+            'index': self.csv_file.index.tolist(),
+            'series': [self.csv_file.sales.tolist(), self.results['predictions']],
+            'series_labels': ['Actual', 'Predicted'],
+            'series_axes': ['y_left', 'y_left'],
+            'x_label': 'Date',
+            'y_label_left': 'Sales',
+            'y_unit_left': self.csv_file.currency,
+        }
+        return chart_data
+
     def _run_bayesian_mmm(self):
         # Implement Bayesian MMM logic here
         pass

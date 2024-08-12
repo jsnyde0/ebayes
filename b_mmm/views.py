@@ -45,8 +45,6 @@ def view_preview(request, file_id=None):
         csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
     # Read the CSV file
-    df = csv_file.data
-    currency = csv_file.currency
     index = csv_file.index # values for the x-axis
     sales = csv_file.sales
     predictors = csv_file.predictors
@@ -65,9 +63,9 @@ def view_preview(request, file_id=None):
             'series_labels': ['Sales', predictor_names[i]],
             'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],
             'y_label_left': 'Sales',
-            'y_label_right': 'Value',
+            'y_label_right': '' if predictor_currencies[i] else 'Amount',
             'y_unit_left': '€',
-            'y_unit_right': predictor_currencies[i] if predictor_currencies[i] else '#'
+            'y_unit_right': '' if predictor_currencies[i] else '#'
         }
         charts_data.append(chart_data)
     

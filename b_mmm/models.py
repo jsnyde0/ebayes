@@ -19,6 +19,9 @@ from sklearn.preprocessing import MaxAbsScaler
 
 from .utils import clean_currency_values, get_currency
 
+import matplotlib
+matplotlib.use('Agg') # because TKinter backend is not thread-safe
+
 # Constants
 CSV_UPLOAD_DIR = 'csv_files'
 

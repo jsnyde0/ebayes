@@ -164,8 +164,7 @@ cython_debug/
 # Dependency directories
 node_modules/
 
-# static and media files
-static/
+# media files
 media/
 
 # powershell scripts

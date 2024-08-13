@@ -10,7 +10,10 @@ from django.core.exceptions import ValidationError
 from .utils import load_and_preprocess_csv
 from sklearn.linear_model import LinearRegression
 import pandas as pd
-import pandas as pd
+import arviz as az
+import matplotlib.pyplot as plt
+import io
+import base64
 
 # Create your views here.
 def view_home(request):
@@ -107,26 +110,47 @@ def view_model(request):
             model_type=model_type
         )
 
-        mmm.run_model()
+        trace, model_posterior_predictive = mmm.run_model()
 
-        model_coefficients = mmm.results['coefficients']
-        model_intercept = mmm.results['intercept']
-        print('model coefficients: ', model_coefficients)
-        print('model intercept: ', model_intercept)
+        # Create the trace plot
+        axes = az.plot_trace(
+            trace,
+            var_names=["intercept", "predictor_coefficients", "sigma", "degrees_freedom"],
+            figsize=(15, 4*4)  # 4 times the number of variable names
+        )
 
-        R_squared = mmm.results['r_squared']
-        print(f'R Squared:  {R_squared}')
+        # Get the figure from the axes
+        fig = axes.ravel()[0].figure
+
+        # Save the plot to a bytes buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+
+        # Encode the image to base64
+        graphic = base64.b64encode(image_png)
+        graphic = graphic.decode('utf-8')
+
+        plt.close(fig)
+
+        # model_coefficients = mmm.results['coefficients']
+        # model_intercept = mmm.results['intercept']
+        # print('model coefficients: ', model_coefficients)
+        # print('model intercept: ', model_intercept)
+
+        # R_squared = mmm.results['r_squared']
+        # print(f'R Squared:  {R_squared}')
 
         # Create a chart for the predicted values against the actual values
-        chart_data = mmm.create_chart_actual_vs_predicted()
+        # chart_data = mmm.create_chart_actual_vs_predicted()
 
         context = {
             'csv_files': csv_files,
             'show_model_results': True,
-            'r_squared': R_squared,
-            'coefficients': dict(zip(csv_file.predictor_columns, model_coefficients)),
-            'intercept': model_intercept,
-            'chart_data': chart_data
+            # 'chart_data': chart_data,
+            'trace_plot': graphic  # Add this line
         }
         
         return render(request, 'mmm/model.html', context)

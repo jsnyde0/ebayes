@@ -18,6 +18,7 @@
       <label for="model_type" class="block text-sm font-medium text-gray-700">Select Model Type</label>
       <select id="model_type" name="model_type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
         <option value="linear_regression">Linear Regression</option>
+        <option value="bayesian_mmm">Bayesian MMM</option>
       </select>
     </div>
     <button type="submit" class="btn btn-primary">Run Model</button>
@@ -52,6 +53,13 @@
           :colors="['rgb(50, 220, 160)', 'rgb(255, 99, 132)']"
         />
       </div>
+
+      <!-- trace plot -->
+      <div class="mb-5">
+        <h3 class="text-xl mb-2">Trace Plot</h3>
+        <img src="data:image/png;base64,{{ trace_plot }}" alt="Trace Plot" class="w-full" height="400" width="400">
+      </div>
+
     </div>
   {% endif %}
 {% endblock main %}

@@ -3,12 +3,16 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
 import pandas as pd
+import numpy as np
+import pymc as pm
 import csv
 import io
 import os
 import uuid
 from typing import List, Optional, Dict, Tuple
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MaxAbsScaler
+
 
 from .utils import clean_currency_values, get_currency
 
@@ -157,11 +161,15 @@ class MarketingMixModel(models.Model):
     def run_model(self):
         if self.model_type == 'linear_regression':
             self._run_linear_regression()
+            return None  # or return appropriate values for linear regression
         elif self.model_type == 'bayesian_mmm':
-            self._run_bayesian_mmm()
-        self.save()
+            result = self._run_bayesian_mmm()
+            self.save()
+            return result
+        else:
+            raise ValueError(f"Unknown model type: {self.model_type}")
 
-    def _run_linear_regression(self):
+    def _run_linear_regression(self): 
         X, y = self.get_csv_file_data()
         model = LinearRegression()
         model.fit(X, y)
@@ -188,6 +196,101 @@ class MarketingMixModel(models.Model):
         return chart_data
 
     def _run_bayesian_mmm(self):
-        # Implement Bayesian MMM logic here
-        pass
+        # Scale X and y
+        X, y = self.get_csv_file_data()
+        y_scaler = MaxAbsScaler()
+        y_scaler.fit(y.to_numpy().reshape(-1, 1))
+        y_scaled = y_scaler.transform(y.to_numpy().reshape(-1, 1)).flatten()
+        X_scaler = MaxAbsScaler()
+        X_scaler.fit(X.to_numpy())
+        X_scaled = X_scaler.transform(X.to_numpy())
+        x_names = self.csv_file.predictor_names
+
+        # Define the model
+        ## define coordinates for clarity and ease of analysis
+        dates = self.csv_file.index.to_numpy()
+        n_dates = len(dates)
+        coords = {"date": dates, "predictor": x_names}
+
+        ## set up scaled linear feature that represents the timeframe
+        ## because we want to model a trend (independent of the predictors), we'll set up a linear feature scaled between 0 and 1
+        # time_linear_0_to_1 = ((abt.index - abt.index.min()) / (abt.index.max() - abt.index.min())).to_numpy()
+        time_linear_0_to_1 = np.linspace(0, 1, n_dates)
+
+        ## set up model definition
+        with pm.Model(coords=coords) as model:
+            ## 1. Add coordinates to model
+            model.add_coord(name="date", values=dates)
+            model.add_coord(name="predictor", values=x_names)
+
+            ## 1. data container for our predictors
+            predictor_values = pm.MutableData(name="predictor_values", value=X_scaled, dims=("date", "predictor"))
+
+            ## 2. Trend
+            ### let's capture the trend a linear line (an intercept and a slope)
+            # intercept = pm.Normal(name="intercept", mu=0, sigma=4) # use this one if you also have a slope, perhaps?
+            intercept = pm.HalfNormal('intercept', sigma=4)
+            slope = pm.Normal(name="slope", mu=0, sigma=2)
+            # t_tensor = pt.tensor(dtype='float32', shape=(58,), name='myvar')
+            trend = pm.Deterministic(name="trend", var=intercept + slope * time_linear_0_to_1, dims="date")
+
+            ## 3. Predictor / Channel Coefficients
+            ### Define priors for the coefficients of the transformed predictors
+            # predictor_coefficients = pm.HalfNormal('predictor_coefficients', sigma=2, shape=n_predictors)
+            predictor_coefficients = pm.HalfNormal('predictor_coefficients', sigma=2, dims="predictor") # don't need the shape argument because it's derived from the dims argument
+            ### predictor effect
+            predictor_effect = pm.Deterministic(
+                name="predictor_effect",
+                var=pm.math.dot(predictor_values, predictor_coefficients),
+                dims=("date")
+            )
+            
+            ## 4. Sales (captured by a StudentT distribution for robustness against outliers)
+            ### 4.1 Expected value of StudentT
+            y_mu = pm.Deterministic(
+                name="y_mu",
+                var=intercept + predictor_effect,
+                dims="date"
+            )
+            
+            ### 4.2 Standard deviation of the StudentT
+            sigma = pm.HalfCauchy('sigma', beta=1)
+            ### 4.3 Degrees of freedom of the StudentT
+            degrees_freedom = pm.Gamma(name="degrees_freedom", alpha=25, beta=2)
+            
+            ### 4.4 Putting it together in the StudenT likelihood function
+            y_observed = pm.StudentT(
+                name="y_observed", 
+                nu=degrees_freedom, 
+                mu=y_mu, sigma=sigma, 
+                observed=y_scaled,
+                dims="date"
+            )
+            # y_observed = pm.Normal('Y_obs', mu=y_mu, sigma=residual_sigma, observed=y_scaled)
+
+            ## 5. Model Visualization
+            model_graph = pm.model_to_graphviz()
+
+        # Run Inference
+        n_tune_samples = 500
+        n_draw_samples = 6000
+        n_chains = 4
+        n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
+
+        with model:
+            ## inference
+            trace = pm.sample(
+                nuts_sampler="numpyro",
+                draws=n_draw_samples,
+                chains=n_chains,
+                idata_kwargs={"log_likelihood": True},
+            )
+
+            ## sample the posterior predictive (which we'll then extract later and visualize)
+            model_posterior_predictive = pm.sample_posterior_predictive(
+                trace=trace,
+            )
+
+        return trace, model_posterior_predictive
+
 

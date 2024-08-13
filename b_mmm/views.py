@@ -98,6 +98,10 @@ def view_model(request):
     if request.method == 'POST':
         file_id = request.POST.get('file_id')
         model_type = request.POST.get('model_type')
+
+        if not file_id or not model_type:
+            messages.error(request, "Missing required fields.")
+            return render(request, 'mmm/model.html', {'csv_files': csv_files})
         
         try:
             csv_file = csv_files.get(id=file_id)
@@ -110,30 +114,13 @@ def view_model(request):
             model_type=model_type
         )
 
-        trace, model_posterior_predictive = mmm.run_model()
-
-        # Create the trace plot
-        axes = az.plot_trace(
-            trace,
-            var_names=["intercept", "predictor_coefficients", "sigma", "degrees_freedom"],
-            figsize=(15, 4*4)  # 4 times the number of variable names
-        )
-
-        # Get the figure from the axes
-        fig = axes.ravel()[0].figure
-
-        # Save the plot to a bytes buffer
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format='png', bbox_inches='tight')
-        buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
-
-        # Encode the image to base64
-        graphic = base64.b64encode(image_png)
-        graphic = graphic.decode('utf-8')
-
-        plt.close(fig)
+        try:
+            mmm.run_model()
+            trace_plot = mmm.plot_trace()
+            messages.success(request, "Model run successfully.")
+        except Exception as e:
+            messages.error(request, f"Error running model: {str(e)}")
+            trace_plot = None
 
         # model_coefficients = mmm.results['coefficients']
         # model_intercept = mmm.results['intercept']
@@ -142,7 +129,7 @@ def view_model(request):
 
         # R_squared = mmm.results['r_squared']
         # print(f'R Squared:  {R_squared}')
-
+ 
         # Create a chart for the predicted values against the actual values
         # chart_data = mmm.create_chart_actual_vs_predicted()
 
@@ -150,7 +137,7 @@ def view_model(request):
             'csv_files': csv_files,
             'show_model_results': True,
             # 'chart_data': chart_data,
-            'trace_plot': graphic  # Add this line
+            'trace_plot': trace_plot  # Add this line
         }
         
         return render(request, 'mmm/model.html', context)

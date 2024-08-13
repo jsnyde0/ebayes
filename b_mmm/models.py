@@ -5,6 +5,9 @@ from django.core.exceptions import ValidationError
 import pandas as pd
 import numpy as np
 import pymc as pm
+import arviz as az
+import matplotlib.pyplot as plt
+import base64
 import csv
 import io
 import os
@@ -143,29 +146,34 @@ class CSVFile(models.Model):
             raise ValidationError(f'Unexpected error processing CSV: {str(e)}')
 
 class MarketingMixModel(models.Model):
+    MODEL_TYPE_LINEAR = 'linear_regression'
+    MODEL_TYPE_BAYESIAN = 'bayesian_mmm'
+    MODEL_TYPE_CHOICES = [
+        (MODEL_TYPE_LINEAR, 'Linear Regression'),
+        (MODEL_TYPE_BAYESIAN, 'Bayesian MMM'),
+    ]
+
     csv_file = models.ForeignKey(CSVFile, on_delete=models.CASCADE, related_name='mmm')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mmm')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    model_type = models.CharField(max_length=50)  # e.g., 'linear_regression', 'bayesian_mmm'
+    model_type = models.CharField(max_length=50, choices=MODEL_TYPE_CHOICES, default=MODEL_TYPE_BAYESIAN)
     parameters = models.JSONField(default=dict)
     results = models.JSONField(default=dict)
 
     # _X: Optional[pd.DataFrame] = None
     # _y: Optional[pd.Series] = None
     # _model: Optional[LinearRegression] = None
+    _mmm_model: Optional[pm.Model] = None
 
     def get_csv_file_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         return self.csv_file.predictors, self.csv_file.sales
 
     def run_model(self):
-        if self.model_type == 'linear_regression':
-            self._run_linear_regression()
-            return None  # or return appropriate values for linear regression
-        elif self.model_type == 'bayesian_mmm':
-            result = self._run_bayesian_mmm()
-            self.save()
-            return result
+        if self.model_type == self.MODEL_TYPE_LINEAR:
+            return self._run_linear_regression()
+        elif self.model_type == self.MODEL_TYPE_BAYESIAN:
+            return self._run_bayesian_mmm()
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
 
@@ -180,6 +188,8 @@ class MarketingMixModel(models.Model):
             'intercept': model.intercept_,
             'predictions': model.predict(X).tolist()
         }
+
+        return self.results
 
     # function that creates the chart data for the predicted values against the actual values
     def create_chart_actual_vs_predicted(self):
@@ -198,12 +208,36 @@ class MarketingMixModel(models.Model):
     def _run_bayesian_mmm(self):
         # Scale X and y
         X, y = self.get_csv_file_data()
+        X_scaled, y_scaled = self._scale_data(X, y)
+        self._mmm_model = self._build_bayesian_model(X_scaled, y_scaled)
+
+        # Run Inference
+        n_tune_samples = 500
+        n_draw_samples = 6000
+        n_chains = 4
+        n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
+
+        trace = self._run_inference(n_draw_samples, n_chains)
+
+        ## sample the posterior predictive (which we'll then extract later and visualize)
+        model_posterior_predictive = self._sample_posterior_predictive(trace)
+
+        self.results = {
+            'model_graph': self._visualize_model(),
+            'trace': trace,
+            'model_posterior_predictive': model_posterior_predictive
+        }
+
+        return self.results
+    
+    def _scale_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         y_scaler = MaxAbsScaler()
-        y_scaler.fit(y.to_numpy().reshape(-1, 1))
-        y_scaled = y_scaler.transform(y.to_numpy().reshape(-1, 1)).flatten()
         X_scaler = MaxAbsScaler()
-        X_scaler.fit(X.to_numpy())
-        X_scaled = X_scaler.transform(X.to_numpy())
+        y_scaled = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()
+        X_scaled = X_scaler.fit_transform(X.to_numpy())
+        return X_scaled, y_scaled
+    
+    def _build_bayesian_model(self, X_scaled: np.ndarray, y_scaled: np.ndarray) -> pm.Model:
         x_names = self.csv_file.predictor_names
 
         # Define the model
@@ -268,29 +302,57 @@ class MarketingMixModel(models.Model):
             )
             # y_observed = pm.Normal('Y_obs', mu=y_mu, sigma=residual_sigma, observed=y_scaled)
 
-            ## 5. Model Visualization
-            model_graph = pm.model_to_graphviz()
+        return model
+    
+    def _visualize_model(self):
+        return pm.model_to_graphviz(self._mmm_model)
+    
+    def _run_inference(self, n_draw_samples: int = 6000, n_chains: int = 4):
+        trace = pm.sample(
+            model=self._mmm_model,
+            nuts_sampler="numpyro",
+            draws=n_draw_samples,
+            chains=n_chains,
+            idata_kwargs={"log_likelihood": True},
+        )
+        return trace
 
-        # Run Inference
-        n_tune_samples = 500
-        n_draw_samples = 6000
-        n_chains = 4
-        n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
+    def _sample_posterior_predictive(self, trace: pm.backends.base.MultiTrace):
+        model_posterior_predictive = pm.sample_posterior_predictive(
+            trace=trace,
+            model=self._mmm_model
+        )
+        return model_posterior_predictive
+    
+    def plot_trace(self):
+        trace = self.results.get('trace', None)
+        if not trace:
+            raise ValueError("Trace not found in results. Please run the model first.")
 
-        with model:
-            ## inference
-            trace = pm.sample(
-                nuts_sampler="numpyro",
-                draws=n_draw_samples,
-                chains=n_chains,
-                idata_kwargs={"log_likelihood": True},
-            )
+        # Create the trace plot
+        axes = az.plot_trace(
+            trace,
+            var_names=["intercept", "predictor_coefficients", "sigma", "degrees_freedom"],
+            figsize=(15, 4*4)  # 4 times the number of variable names
+        )
 
-            ## sample the posterior predictive (which we'll then extract later and visualize)
-            model_posterior_predictive = pm.sample_posterior_predictive(
-                trace=trace,
-            )
+        # Get the figure from the axes
+        fig = axes.ravel()[0].figure
 
-        return trace, model_posterior_predictive
+        # Save the plot to a bytes buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+
+        # Encode the image to base64
+        graphic = base64.b64encode(image_png)
+        graphic = graphic.decode('utf-8')
+
+        plt.close(fig)
+
+        return graphic
+
 
 

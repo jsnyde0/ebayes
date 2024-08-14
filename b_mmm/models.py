@@ -8,6 +8,7 @@ import numpy as np
 import pymc as pm
 import arviz as az
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import base64
 import csv
 import io
@@ -18,7 +19,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MaxAbsScaler
 
 
-from .utils import clean_currency_values, get_currency
+from .utils import clean_currency_values, get_currency, currency_formatter
 
 import matplotlib
 matplotlib.use('Agg') # because TKinter backend is not thread-safe
@@ -173,12 +174,16 @@ class MarketingMixModel(models.Model):
     results = models.JSONField(default=dict)
 
     trace_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
+    parameter_posteriors_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
+    y_posterior_predictive_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
 
-    # _X: Optional[pd.DataFrame] = None
-    # _y: Optional[pd.Series] = None
+    _X: Optional[pd.DataFrame] = None
+    _y: Optional[pd.Series] = None
     # _model: Optional[LinearRegression] = None
+    _y_scaler: Optional[MaxAbsScaler] = None
     _mmm_model: Optional[pm.Model] = None
     _trace: Optional[pm.backends.base.MultiTrace] = None
+    _y_posterior_predictive: Optional[np.ndarray] = None
 
     def __str__(self):
         return f"MMM for {self.csv_file.file_name} ({self.model_type})"
@@ -224,8 +229,8 @@ class MarketingMixModel(models.Model):
 
     def _run_bayesian_mmm(self):
         # Scale X and y
-        X, y = self.get_csv_file_data()
-        X_scaled, y_scaled = self._scale_data(X, y)
+        self._X, self._y = self.get_csv_file_data()
+        X_scaled, y_scaled = self._scale_data(self._X, self._y)
         self._mmm_model = self._build_bayesian_model(X_scaled, y_scaled)
 
         # Run Inference
@@ -251,9 +256,9 @@ class MarketingMixModel(models.Model):
         return self.results
     
     def _scale_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
-        y_scaler = MaxAbsScaler()
+        self._y_scaler = MaxAbsScaler()
         X_scaler = MaxAbsScaler()
-        y_scaled = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()
+        y_scaled = self._y_scaler.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()
         X_scaled = X_scaler.fit_transform(X.to_numpy())
         return X_scaled, y_scaled
     
@@ -369,6 +374,155 @@ class MarketingMixModel(models.Model):
         self.trace_plot.save(f'trace_plot.png', ContentFile(buffer.getvalue()), save=True)
 
         # Save the entire model instance
+        self.save()
+
+    def plot_parameter_posteriors(self):
+        if not self._trace:
+            raise ValueError("No trace found. Please run the model first.")
+
+        var_names_to_plot = ["intercept", "predictor_coefficients", "sigma"]
+        n_vars = len(var_names_to_plot)
+
+        axes = az.plot_posterior(
+				self._trace
+				, var_names=var_names_to_plot
+				, figsize=(15,4*n_vars) # 4 times the number of variable names
+			);
+        fig = axes.ravel()[0].figure
+
+        # Save to an in-memory buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+
+        plt.close(fig)
+
+        # Save the plot directly from the buffer to the ImageField
+        self.parameter_posteriors_plot.save(f'parameter_posteriors_plot.png', ContentFile(buffer.getvalue()), save=True)
+
+        # Save the entire model instance
+        self.save()
+
+    def _extract_y_posterior_predictive(self):
+        if not self._trace:
+            raise ValueError("No trace found. Please run the model first.")
+        
+        if not self._mmm_model:
+            raise ValueError("No model found. Please run the model first.")
+
+        if not self._y_scaler:
+            raise ValueError("No y scaler found. Please run the model first.")
+        
+        # sample the posterior predictive
+        model_posterior_predictive = pm.sample_posterior_predictive(
+            trace=self._trace,
+            model=self._mmm_model
+        )
+
+        # extract the posterior predictive for y (remember that y is scaled)
+        y_scaled_posterior_predictive = az.extract(
+            data=model_posterior_predictive,
+            group="posterior_predictive",
+            var_names="y_observed",
+        )
+
+        ## unscale it back to original y-value space
+        self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
+
+    def compute_accuracy_metrics(self):
+        if not self._y_posterior_predictive:
+            self._extract_y_posterior_predictive()
+
+        # compute mean
+        y_posterior_mean = self._y_posterior_predictive.mean(axis=1)
+
+        # compute accuracy metrics
+        r_squared = round(metrics.r2_score(self._y, y_posterior_mean), 3)
+        mse = metrics.mean_squared_error(self._y, y_posterior_mean)
+        rmse = round(np.sqrt(mse))
+        y_mean = np.mean(self._y)
+        nrmse = round(rmse/y_mean*100, 1)
+        mape = round(metrics.mean_absolute_error(self._y, y_posterior_mean)/y_mean * 100,1)
+
+        self.results['accuracy_metrics'] = {
+            'r_squared': r_squared,
+            'mse': mse,
+            'rmse': rmse,
+            'y_mean': np.mean(self._y),
+            'nrmse': nrmse,
+            'mape': mape
+        }
+
+        self.save()
+
+        return self.results['accuracy_metrics']
+
+    def plot_posterior_predictive(self):
+        if not self._y_posterior_predictive:
+            self._extract_y_posterior_predictive()
+        
+        # 1) set up percentile ranges and a colour map we'll use for plotting posterior distributions
+
+        ## Generates 100 evenly spaced percentiles between 51% and 99%
+        n_percentiles = 50
+        percentile_ranges = np.linspace(51, 99, n_percentiles)
+
+        ## choose a colour pallete
+        palette = "Greens"
+        cmap = plt.get_cmap(palette)
+
+        ## normalize the percentile range values between 0 and 1 so that it maps to the colour palette
+        color_range = (percentile_ranges - np.min(percentile_ranges)) / (np.max(percentile_ranges) - np.min(percentile_ranges))
+        color_range = np.linspace(0.1, 0.9, n_percentiles)
+
+        # 2) Plot
+
+        ## compute the posterior mean
+        y_posterior_mean = self._y_posterior_predictive.mean(axis=1)
+
+        ## Plot the posterior mean
+        fig, ax = plt.subplots(figsize=(15, 6))
+        # plt.figure(figsize=(15, 6))
+        ax.plot(self._y, color='k', label='Actual')
+        ax.plot(y_posterior_mean, color='turquoise', label='Posterior Mean')
+
+        ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
+        for i, percentile in enumerate(percentile_ranges[::-1]):
+            upper_percentile = np.percentile(self._y_posterior_predictive, percentile, axis=1)
+            lower_percentile = np.percentile(self._y_posterior_predictive, 100 - percentile, axis=1)
+            color_val = color_range[i]
+            ax.fill_between(
+                x=self.csv_file.index,
+                y1=upper_percentile,
+                y2=lower_percentile,
+                color=cmap(color_val),
+                alpha=0.1,
+            )
+
+        ## Rotate x-axis labels
+        ax.set_xticklabels(self.csv_file.index, rotation=45, ha='right')
+
+        ## format the title, legend and annotate the R Squared onto the plot
+        ax.set_title('Sales - Real vs Forecast', y=1.12)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=3)
+
+        ## format the x- and y-axis
+        ax.set_xlabel('Date')
+        ax.yaxis.set_major_formatter(FuncFormatter(currency_formatter))
+        ax.set_ylabel(f'Sales [{self.csv_file.currency}]')
+
+        # 3) Save the plot
+
+        ## Save to an in-memory buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        plt.close(fig)
+
+        ## Save the plot directly from the buffer to the ImageField
+        self.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot.png', ContentFile(buffer.getvalue()), save=True)
+
+        ## Save the entire model instance
         self.save()
 
 

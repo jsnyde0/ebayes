@@ -1,6 +1,38 @@
 import pandas as pd
 import numpy as np
 
+def currency_formatter(x, currency_symbol='€', decimal_places=0, thousands_sep=',', decimal_sep='.'):
+    """
+    Format a number as a Euro currency string.
+    
+    Args:
+        x (float): The number to format.
+        decimal_places (int): Number of decimal places to show. Default is 0.
+        thousands_sep (str): The thousands separator. Default is ','.
+        decimal_sep (str): The decimal separator. Default is '.'.
+    
+    Returns:
+        str: Formatted Euro currency string.
+    """
+    try:
+        # Convert to float in case it's a string or other type
+        value = float(x)
+        
+        # Format the number
+        formatted = f'{value:,.{decimal_places}f}'
+        
+        # Replace separators if needed
+        if thousands_sep != ',':
+            formatted = formatted.replace(',', thousands_sep)
+        if decimal_sep != '.':
+            formatted = formatted.replace('.', decimal_sep)
+        
+        # Add Euro symbol
+        return f'{currency_symbol}{formatted}'
+    except ValueError:
+        # Return original input if conversion fails
+        return f'{currency_symbol}{x}'
+
 def get_currency(values, currency_symbols=None):
     currency_symbols = currency_symbols or ['€', '$', '£', '¥']
     for symbol in currency_symbols:

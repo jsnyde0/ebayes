@@ -167,8 +167,5 @@ node_modules/
 # media files
 media/
 
-# powershell scripts
-*.ps1
-
 # testing data
 .data/

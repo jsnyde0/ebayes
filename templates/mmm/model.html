@@ -1,14 +1,14 @@
 {% extends "layouts/default.html" %}
 {% block main %}
   <h1 class="mb-6 text-3xl">Model Config & Inference</h1>
-
-  <h2 class="mb-6 text-2xl"> Model Configuration </h2>
-
+  <h2 class="mb-6 text-2xl">Model Configuration</h2>
   <form method="post" class="mb-6">
     {% csrf_token %}
     <div class="mb-4">
       <label for="file_id" class="block text-sm font-medium text-gray-700">Select CSV File</label>
-      <select id="file_id" name="file_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+      <select id="file_id"
+              name="file_id"
+              class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
         {% for file in csv_files %}
           <option value="{{ file.id }}">{{ file.file_name }} ({{ file.created_at|date:"Y-m-d H:i" }})</option>
         {% endfor %}
@@ -16,17 +16,17 @@
     </div>
     <div class="mb-4">
       <label for="model_type" class="block text-sm font-medium text-gray-700">Select Model Type</label>
-      <select id="model_type" name="model_type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+      <select id="model_type"
+              name="model_type"
+              class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        <option value="bayesian_mmm" selected>Bayesian MMM</option>
         <option value="linear_regression">Linear Regression</option>
-        <option value="bayesian_mmm">Bayesian MMM</option>
       </select>
     </div>
     <button type="submit" class="btn btn-primary">Run Model</button>
   </form>
-
-  {% if show_model_results %}
+  {% if mmm %}
     <h2 class="mb-6 text-2xl">Model Results</h2>
-
     <div id="results-container" class="grid grid-cols-1 gap-4">
       {% comment %} <div class="mb-5">
         <ul>
@@ -40,26 +40,24 @@
           <li>y_unit_left: {{ chart_data.y_unit_left }}</li>
         </ul>
       </div> {% endcomment %}
-      <div class="h-[400px] mb-5">
-        <c-line-chart 
-          chart_id="{{ chart_data.chart_id }}"  
-          :index="chart_data.index" 
-          :series="chart_data.series" 
-          :series_labels="chart_data.series_labels"
-          :series_axes="chart_data.series_axes"
-          x_label="{{ chart_data.x_label }}"
-          y_label_left="{{ chart_data.y_label_left }}"
-          y_unit_left="{{ chart_data.y_unit_left }}"
-          :colors="['rgb(50, 220, 160)', 'rgb(255, 99, 132)']"
-        />
-      </div>
-
+      {% if chart_data %}
+        <div class="h-[400px] mb-5">
+          <c-line-chart chart_id="{{ chart_data.chart_id }}" :index="chart_data.index" :series="chart_data.series" :series_labels="chart_data.series_labels" :series_axes="chart_data.series_axes" x_label="{{ chart_data.x_label }}" y_label_left="{{ chart_data.y_label_left }}" y_unit_left="{{ chart_data.y_unit_left }}" :colors="['rgb(50, 220, 160)', 'rgb(255, 99, 132)']" />
+        </div>
+      {% endif %}
       <!-- trace plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Trace Plot</h3>
-        <img src="data:image/png;base64,{{ trace_plot }}" alt="Trace Plot" class="w-full" height="400" width="400">
+        {% if mmm.trace_plot %}
+          <img src="{{ mmm.trace_plot.url }}"
+               alt="Trace Plot"
+               class="w-full"
+               height="400"
+               width="400">
+        {% else %}
+          <p>No trace plot available.</p>
+        {% endif %}
       </div>
-
     </div>
   {% endif %}
 {% endblock main %}

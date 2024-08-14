@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 
 import pandas as pd
 import numpy as np
@@ -24,12 +25,19 @@ matplotlib.use('Agg') # because TKinter backend is not thread-safe
 
 # Constants
 CSV_UPLOAD_DIR = 'csv_files'
+PLOT_DIR = 'plots'
 
 def get_file_path(instance: 'CSVFile', filename: str) -> str:
     """Generate a unique file path for uploaded CSV files."""
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join(CSV_UPLOAD_DIR, filename)
+
+def get_plot_path(instance: 'MarketingMixModel', filename: str) -> str:
+    """Generate a unique file path for plot images."""
+    ext = filename.split('.')[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    return os.path.join(PLOT_DIR, filename)
 
 class CSVFile(models.Model):
     """Model to store and process uploaded CSV files in a format handy for MMM."""
@@ -164,10 +172,16 @@ class MarketingMixModel(models.Model):
     parameters = models.JSONField(default=dict)
     results = models.JSONField(default=dict)
 
+    trace_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
+
     # _X: Optional[pd.DataFrame] = None
     # _y: Optional[pd.Series] = None
     # _model: Optional[LinearRegression] = None
     _mmm_model: Optional[pm.Model] = None
+    _trace: Optional[pm.backends.base.MultiTrace] = None
+
+    def __str__(self):
+        return f"MMM for {self.csv_file.file_name} ({self.model_type})"
 
     def get_csv_file_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         return self.csv_file.predictors, self.csv_file.sales
@@ -220,16 +234,19 @@ class MarketingMixModel(models.Model):
         n_chains = 4
         n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
 
-        trace = self._run_inference(n_draw_samples, n_chains)
+        self._run_inference(n_draw_samples, n_chains) # assigns self._trace
 
         ## sample the posterior predictive (which we'll then extract later and visualize)
-        model_posterior_predictive = self._sample_posterior_predictive(trace)
+        # model_posterior_predictive = self._sample_posterior_predictive(trace)
 
         self.results = {
-            'model_graph': self._visualize_model(),
-            'trace': trace,
-            'model_posterior_predictive': model_posterior_predictive
+            # 'model_graph': self._visualize_model(),
+            # 'trace': trace,
+            # 'model_posterior_predictive': model_posterior_predictive
         }
+
+        # Save the entire model instance
+        self.save()
 
         return self.results
     
@@ -311,51 +328,48 @@ class MarketingMixModel(models.Model):
         return pm.model_to_graphviz(self._mmm_model)
     
     def _run_inference(self, n_draw_samples: int = 6000, n_chains: int = 4):
-        trace = pm.sample(
+        self._trace = pm.sample(
             model=self._mmm_model,
             nuts_sampler="numpyro",
             draws=n_draw_samples,
             chains=n_chains,
             idata_kwargs={"log_likelihood": True},
         )
-        return trace
+        # return self._trace
 
-    def _sample_posterior_predictive(self, trace: pm.backends.base.MultiTrace):
+    def _sample_posterior_predictive(self):
         model_posterior_predictive = pm.sample_posterior_predictive(
-            trace=trace,
+            trace=self._trace,
             model=self._mmm_model
         )
         return model_posterior_predictive
-    
+
     def plot_trace(self):
-        trace = self.results.get('trace', None)
-        if not trace:
-            raise ValueError("Trace not found in results. Please run the model first.")
+        if not self._trace:
+            raise ValueError("No trace found. Please run the model first.")
 
-        # Create the trace plot
+        var_names_to_plot = ["intercept", "predictor_coefficients", "sigma", "degrees_freedom"]
+        n_vars = len(var_names_to_plot)
+
         axes = az.plot_trace(
-            trace,
-            var_names=["intercept", "predictor_coefficients", "sigma", "degrees_freedom"],
-            figsize=(15, 4*4)  # 4 times the number of variable names
+            self._trace,
+            var_names=var_names_to_plot,
+            figsize=(15, 4*n_vars)
         )
-
-        # Get the figure from the axes
         fig = axes.ravel()[0].figure
 
-        # Save the plot to a bytes buffer
+        # Save to an in-memory buffer
         buffer = io.BytesIO()
         fig.savefig(buffer, format='png', bbox_inches='tight')
         buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
-
-        # Encode the image to base64
-        graphic = base64.b64encode(image_png)
-        graphic = graphic.decode('utf-8')
 
         plt.close(fig)
 
-        return graphic
+        # Save the plot directly from the buffer to the ImageField
+        self.trace_plot.save(f'trace_plot.png', ContentFile(buffer.getvalue()), save=True)
+
+        # Save the entire model instance
+        self.save()
 
 
 

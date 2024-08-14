@@ -116,11 +116,10 @@ def view_model(request):
 
         try:
             mmm.run_model()
-            trace_plot = mmm.plot_trace()
+            mmm.plot_trace()
             messages.success(request, "Model run successfully.")
         except Exception as e:
             messages.error(request, f"Error running model: {str(e)}")
-            trace_plot = None
 
         # model_coefficients = mmm.results['coefficients']
         # model_intercept = mmm.results['intercept']
@@ -135,11 +134,19 @@ def view_model(request):
 
         context = {
             'csv_files': csv_files,
-            'show_model_results': True,
             # 'chart_data': chart_data,
-            'trace_plot': trace_plot  # Add this line
+            'mmm': mmm
         }
         
         return render(request, 'mmm/model.html', context)
+
+    # for a GET request, get the latest bayesian model for the most recent csv file
+    recent_csv_file = csv_files.first()
+    recent_bayesian_mmm = MarketingMixModel.objects.filter(user=request.user, csv_file=recent_csv_file, model_type='bayesian_mmm').order_by('-created_at').first()
     
-    return render(request, 'mmm/model.html', {'csv_files': csv_files})
+    context = {
+        'csv_files': csv_files,
+        'mmm': recent_bayesian_mmm
+    }
+
+    return render(request, 'mmm/model.html', context)

@@ -119,6 +119,7 @@ def view_model(request):
             mmm.plot_trace()
             mmm.plot_parameter_posteriors()
             mmm.plot_posterior_predictive()
+            mmm.compute_accuracy_metrics()
             messages.success(request, "Model run successfully.")
         except Exception as e:
             messages.error(request, f"Error running model: {str(e)}")

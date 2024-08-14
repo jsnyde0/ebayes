@@ -71,6 +71,62 @@
           <p>No parameter posteriors plot available.</p>
         {% endif %}
       </div>
+      <!-- accuracy metrics -->
+      <div class="mb-5">
+        <h3 class="text-xl mb-2">Model Accuracy Metrics</h3>
+        {% if mmm.results.accuracy_metrics %}
+        <div class="relative overflow-x-auto">
+          <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" class="px-6 py-3">
+                  Metric
+                </th>
+                <th scope="col" class="px-6 py-3">
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  R-squared
+                </th>
+                <td class="px-6 py-4">
+                  {{ mmm.results.accuracy_metrics.r_squared }}
+                </td>
+              </tr>
+              <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  RMSE
+                </th>
+                <td class="px-6 py-4">
+                  {{ mmm.results.accuracy_metrics.rmse }}
+                </td>
+              </tr>
+              <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  NRMSE
+                </th>
+                <td class="px-6 py-4">
+                  {{ mmm.results.accuracy_metrics.nrmse }}%
+                </td>
+              </tr>
+              <tr class="bg-white dark:bg-gray-800">
+                <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  MAPE
+                </th>
+                <td class="px-6 py-4">
+                  {{ mmm.results.accuracy_metrics.mape }}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p>No accuracy metrics available.</p>
+        {% endif %}
+      </div>
       <!-- y posterior predictive plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Y Posterior Predictive Plot</h3>

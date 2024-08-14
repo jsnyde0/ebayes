@@ -17,6 +17,7 @@ import uuid
 from typing import List, Optional, Dict, Tuple
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MaxAbsScaler
+from sklearn import metrics
 
 
 from .utils import clean_currency_values, get_currency, currency_formatter
@@ -333,6 +334,9 @@ class MarketingMixModel(models.Model):
         return pm.model_to_graphviz(self._mmm_model)
     
     def _run_inference(self, n_draw_samples: int = 6000, n_chains: int = 4):
+        if self._mmm_model is None:
+            raise ValueError("No model found. Please run the model first.")
+        
         self._trace = pm.sample(
             model=self._mmm_model,
             nuts_sampler="numpyro",
@@ -343,6 +347,12 @@ class MarketingMixModel(models.Model):
         # return self._trace
 
     def _sample_posterior_predictive(self):
+        if self._trace is None:
+            raise ValueError("No trace found. Please run the model first.")
+        
+        if self._mmm_model is None:
+            raise ValueError("No model found. Please run the model first.")
+
         model_posterior_predictive = pm.sample_posterior_predictive(
             trace=self._trace,
             model=self._mmm_model
@@ -350,7 +360,7 @@ class MarketingMixModel(models.Model):
         return model_posterior_predictive
 
     def plot_trace(self):
-        if not self._trace:
+        if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
         var_names_to_plot = ["intercept", "predictor_coefficients", "sigma", "degrees_freedom"]
@@ -377,7 +387,7 @@ class MarketingMixModel(models.Model):
         self.save()
 
     def plot_parameter_posteriors(self):
-        if not self._trace:
+        if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
         var_names_to_plot = ["intercept", "predictor_coefficients", "sigma"]
@@ -404,13 +414,13 @@ class MarketingMixModel(models.Model):
         self.save()
 
     def _extract_y_posterior_predictive(self):
-        if not self._trace:
+        if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
         
-        if not self._mmm_model:
+        if self._mmm_model is None:
             raise ValueError("No model found. Please run the model first.")
 
-        if not self._y_scaler:
+        if self._y_scaler is None:
             raise ValueError("No y scaler found. Please run the model first.")
         
         # sample the posterior predictive
@@ -430,7 +440,7 @@ class MarketingMixModel(models.Model):
         self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
 
     def compute_accuracy_metrics(self):
-        if not self._y_posterior_predictive:
+        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
             self._extract_y_posterior_predictive()
 
         # compute mean
@@ -458,7 +468,7 @@ class MarketingMixModel(models.Model):
         return self.results['accuracy_metrics']
 
     def plot_posterior_predictive(self):
-        if not self._y_posterior_predictive:
+        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
             self._extract_y_posterior_predictive()
         
         # 1) set up percentile ranges and a colour map we'll use for plotting posterior distributions

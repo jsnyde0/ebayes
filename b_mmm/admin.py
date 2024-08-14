@@ -11,8 +11,8 @@ class CSVFileAdmin(admin.ModelAdmin):
 
 @admin.register(MarketingMixModel)
 class MarketingMixModelAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'csv_file', 'model_type', 'created_at', 'updated_at')
-    list_filter = ('model_type', 'user')
+    list_display = ('id', 'user', 'csv_file', 'created_at', 'updated_at')
+    list_filter = ('user',)
     search_fields = ('user__username', 'csv_file__file_name')
     readonly_fields = ('created_at', 'updated_at')
 

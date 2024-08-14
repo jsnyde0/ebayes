@@ -159,24 +159,21 @@ class CSVFile(models.Model):
             raise ValidationError(f'Unexpected error processing CSV: {str(e)}')
 
 class MarketingMixModel(models.Model):
-    MODEL_TYPE_LINEAR = 'linear_regression'
-    MODEL_TYPE_BAYESIAN = 'bayesian_mmm'
-    MODEL_TYPE_CHOICES = [
-        (MODEL_TYPE_LINEAR, 'Linear Regression'),
-        (MODEL_TYPE_BAYESIAN, 'Bayesian MMM'),
-    ]
-
     csv_file = models.ForeignKey(CSVFile, on_delete=models.CASCADE, related_name='mmm')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mmm')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    model_type = models.CharField(max_length=50, choices=MODEL_TYPE_CHOICES, default=MODEL_TYPE_BAYESIAN)
     parameters = models.JSONField(default=dict)
     results = models.JSONField(default=dict)
 
+    # plot fields
     trace_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     parameter_posteriors_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     y_posterior_predictive_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
+
+    # computation results
+    trace_data = models.BinaryField(null=True, blank=True)
+    posterior_predictive_samples = models.BinaryField(null=True, blank=True)
 
     _X: Optional[pd.DataFrame] = None
     _y: Optional[pd.Series] = None
@@ -187,48 +184,12 @@ class MarketingMixModel(models.Model):
     _y_posterior_predictive: Optional[np.ndarray] = None
 
     def __str__(self):
-        return f"MMM for {self.csv_file.file_name} ({self.model_type})"
+        return f"MMM for {self.csv_file.file_name}"
 
     def get_csv_file_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         return self.csv_file.predictors, self.csv_file.sales
 
     def run_model(self):
-        if self.model_type == self.MODEL_TYPE_LINEAR:
-            return self._run_linear_regression()
-        elif self.model_type == self.MODEL_TYPE_BAYESIAN:
-            return self._run_bayesian_mmm()
-        else:
-            raise ValueError(f"Unknown model type: {self.model_type}")
-
-    def _run_linear_regression(self): 
-        X, y = self.get_csv_file_data()
-        model = LinearRegression()
-        model.fit(X, y)
-        
-        self.results = {
-            'r_squared': round(model.score(X, y), 2),
-            'coefficients': dict(zip(X.columns, model.coef_)),
-            'intercept': model.intercept_,
-            'predictions': model.predict(X).tolist()
-        }
-
-        return self.results
-
-    # function that creates the chart data for the predicted values against the actual values
-    def create_chart_actual_vs_predicted(self):
-        chart_data = {
-            'chart_id': 'chart_actual_vs_predicted',
-            'index': self.csv_file.index.tolist(),
-            'series': [self.csv_file.sales.tolist(), self.results['predictions']],
-            'series_labels': ['Actual', 'Predicted'],
-            'series_axes': ['y_left', 'y_left'],
-            'x_label': 'Date',
-            'y_label_left': 'Sales',
-            'y_unit_left': self.csv_file.currency,
-        }
-        return chart_data
-
-    def _run_bayesian_mmm(self):
         # Scale X and y
         self._X, self._y = self.get_csv_file_data()
         X_scaled, y_scaled = self._scale_data(self._X, self._y)

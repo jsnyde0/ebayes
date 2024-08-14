@@ -99,7 +99,7 @@ def view_model(request):
         file_id = request.POST.get('file_id')
         model_type = request.POST.get('model_type')
 
-        if not file_id or not model_type:
+        if not file_id:
             messages.error(request, "Missing required fields.")
             return render(request, 'mmm/model.html', {'csv_files': csv_files})
         
@@ -111,7 +111,6 @@ def view_model(request):
         mmm, created = MarketingMixModel.objects.get_or_create(
             csv_file=csv_file,
             user=request.user,
-            model_type=model_type
         )
 
         try:
@@ -124,20 +123,8 @@ def view_model(request):
         except Exception as e:
             messages.error(request, f"Error running model: {str(e)}")
 
-        # model_coefficients = mmm.results['coefficients']
-        # model_intercept = mmm.results['intercept']
-        # print('model coefficients: ', model_coefficients)
-        # print('model intercept: ', model_intercept)
-
-        # R_squared = mmm.results['r_squared']
-        # print(f'R Squared:  {R_squared}')
- 
-        # Create a chart for the predicted values against the actual values
-        # chart_data = mmm.create_chart_actual_vs_predicted()
-
         context = {
             'csv_files': csv_files,
-            # 'chart_data': chart_data,
             'mmm': mmm
         }
         
@@ -145,7 +132,7 @@ def view_model(request):
 
     # for a GET request, get the latest bayesian model for the most recent csv file
     recent_csv_file = csv_files.first()
-    recent_bayesian_mmm = MarketingMixModel.objects.filter(user=request.user, csv_file=recent_csv_file, model_type='bayesian_mmm').order_by('-created_at').first()
+    recent_bayesian_mmm = MarketingMixModel.objects.filter(user=request.user, csv_file=recent_csv_file).order_by('-created_at').first()
     
     context = {
         'csv_files': csv_files,

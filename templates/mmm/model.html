@@ -20,7 +20,6 @@
               name="model_type"
               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
         <option value="bayesian_mmm" selected>Bayesian MMM</option>
-        <option value="linear_regression">Linear Regression</option>
       </select>
     </div>
     <button type="submit" class="btn btn-primary">Run Model</button>
@@ -28,23 +27,6 @@
   {% if mmm %}
     <h2 class="mb-6 text-2xl">Model Results</h2>
     <div id="results-container" class="grid grid-cols-1 gap-4">
-      {% comment %} <div class="mb-5">
-        <ul>
-          <li>chartId: {{ chart_data.chart_id }}</li>
-          <li>index: {{ chart_data.index }}</li>
-          <li>series: {{ chart_data.series }}</li>
-          <li>series_labels: {{ chart_data.series_labels }}</li>
-          <li>series_axes: {{ chart_data.series_axes }}</li>
-          <li>x_label: {{ chart_data.x_label }}</li>
-          <li>y_label_left: {{ chart_data.y_label_left }}</li>
-          <li>y_unit_left: {{ chart_data.y_unit_left }}</li>
-        </ul>
-      </div> {% endcomment %}
-      {% if chart_data %}
-        <div class="h-[400px] mb-5">
-          <c-line-chart chart_id="{{ chart_data.chart_id }}" :index="chart_data.index" :series="chart_data.series" :series_labels="chart_data.series_labels" :series_axes="chart_data.series_axes" x_label="{{ chart_data.x_label }}" y_label_left="{{ chart_data.y_label_left }}" y_unit_left="{{ chart_data.y_unit_left }}" :colors="['rgb(50, 220, 160)', 'rgb(255, 99, 132)']" />
-        </div>
-      {% endif %}
       <!-- trace plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Trace Plot</h3>

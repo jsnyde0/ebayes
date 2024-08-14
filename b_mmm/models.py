@@ -14,6 +14,7 @@ import csv
 import io
 import os
 import uuid
+import pickle
 from typing import List, Optional, Dict, Tuple
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MaxAbsScaler
@@ -172,8 +173,8 @@ class MarketingMixModel(models.Model):
     y_posterior_predictive_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
 
     # computation results
-    trace_data = models.BinaryField(null=True, blank=True)
-    posterior_predictive_samples = models.BinaryField(null=True, blank=True)
+    trace_binary = models.BinaryField(null=True, blank=True)
+    y_posterior_predictive_binary = models.BinaryField(null=True, blank=True)
 
     _X: Optional[pd.DataFrame] = None
     _y: Optional[pd.Series] = None
@@ -190,6 +191,10 @@ class MarketingMixModel(models.Model):
         return self.csv_file.predictors, self.csv_file.sales
 
     def run_model(self):
+        if self.trace_binary and self.y_posterior_predictive_binary:
+            self._load_saved_results()
+            return
+        
         # Scale X and y
         self._X, self._y = self.get_csv_file_data()
         X_scaled, y_scaled = self._scale_data(self._X, self._y)
@@ -203,19 +208,18 @@ class MarketingMixModel(models.Model):
 
         self._run_inference(n_draw_samples, n_chains) # assigns self._trace
 
-        ## sample the posterior predictive (which we'll then extract later and visualize)
-        # model_posterior_predictive = self._sample_posterior_predictive(trace)
+        self._compute_y_posterior_predictive()
 
-        self.results = {
-            # 'model_graph': self._visualize_model(),
-            # 'trace': trace,
-            # 'model_posterior_predictive': model_posterior_predictive
-        }
+        self._save_results()
 
-        # Save the entire model instance
+    def _load_saved_results(self):
+        self._trace = pickle.loads(self.trace_binary)
+        self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
+
+    def _save_results(self):
+        self.trace_binary = pickle.dumps(self._trace)
+        self.y_posterior_predictive_binary = pickle.dumps(self._y_posterior_predictive)
         self.save()
-
-        return self.results
     
     def _scale_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         self._y_scaler = MaxAbsScaler()
@@ -307,19 +311,6 @@ class MarketingMixModel(models.Model):
         )
         # return self._trace
 
-    def _sample_posterior_predictive(self):
-        if self._trace is None:
-            raise ValueError("No trace found. Please run the model first.")
-        
-        if self._mmm_model is None:
-            raise ValueError("No model found. Please run the model first.")
-
-        model_posterior_predictive = pm.sample_posterior_predictive(
-            trace=self._trace,
-            model=self._mmm_model
-        )
-        return model_posterior_predictive
-
     def plot_trace(self):
         if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
@@ -374,7 +365,14 @@ class MarketingMixModel(models.Model):
         # Save the entire model instance
         self.save()
 
-    def _extract_y_posterior_predictive(self):
+    def _load_y_posterior_predictive(self):
+        if self._y_posterior_predictive is None:
+            if self.y_posterior_predictive_binary:
+                self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
+            else:
+                self.run_model()
+    
+    def _compute_y_posterior_predictive(self):
         if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
         
@@ -401,8 +399,11 @@ class MarketingMixModel(models.Model):
         self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
 
     def compute_accuracy_metrics(self):
+        if 'accuracy_metrics' in self.results:
+            return self.results['accuracy_metrics']
+
         if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
-            self._extract_y_posterior_predictive()
+            self._load_y_posterior_predictive()
 
         # compute mean
         y_posterior_mean = self._y_posterior_predictive.mean(axis=1)
@@ -430,7 +431,10 @@ class MarketingMixModel(models.Model):
 
     def plot_posterior_predictive(self):
         if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
-            self._extract_y_posterior_predictive()
+            self._load_y_posterior_predictive()
+        
+        if self._y is None:
+            _, self._y = self.get_csv_file_data()
         
         # 1) set up percentile ranges and a colour map we'll use for plotting posterior distributions
 

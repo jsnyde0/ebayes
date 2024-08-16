@@ -126,9 +126,9 @@ def view_model(request):
         context = {
             'csv_files': csv_files,
             'mmm': mmm,
-            'trace_plot_url': mmm.trace_plot.url,
-            'parameter_posteriors_plot_url': mmm.parameter_posteriors_plot.url,
-            'y_posterior_predictive_plot_url': mmm.y_posterior_predictive_plot.url,
+            'trace_plot_url': mmm.get_plot_url('trace'),
+            'parameter_posteriors_plot_url': mmm.get_plot_url('parameter_posteriors'),
+            'y_posterior_predictive_plot_url': mmm.get_plot_url('y_posterior_predictive'),
         }
         
         return render(request, 'mmm/model.html', context)
@@ -141,9 +141,9 @@ def view_model(request):
         'csv_files': csv_files,
         'mmm_exists': recent_bayesian_mmm is not None,
         'mmm_accuracy_metrics': recent_bayesian_mmm.results['accuracy_metrics'] if recent_bayesian_mmm else None,
-        'trace_plot_url': recent_bayesian_mmm.trace_plot.url if recent_bayesian_mmm else None,
-        'parameter_posteriors_plot_url': recent_bayesian_mmm.parameter_posteriors_plot.url if recent_bayesian_mmm else None,
-        'y_posterior_predictive_plot_url': recent_bayesian_mmm.y_posterior_predictive_plot.url if recent_bayesian_mmm else None,
+        'trace_plot_url': recent_bayesian_mmm.get_plot_url('trace') if recent_bayesian_mmm else None,
+        'parameter_posteriors_plot_url': recent_bayesian_mmm.get_plot_url('parameter_posteriors') if recent_bayesian_mmm else None,
+        'y_posterior_predictive_plot_url': recent_bayesian_mmm.get_plot_url('y_posterior_predictive') if recent_bayesian_mmm else None,
     }
 
     return render(request, 'mmm/model.html', context)

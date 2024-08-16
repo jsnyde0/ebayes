@@ -311,7 +311,7 @@ class MarketingMixModel(models.Model):
         )
         # return self._trace
 
-    def plot_trace(self):
+    def _generate_trace_plot(self):
         if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
@@ -338,7 +338,7 @@ class MarketingMixModel(models.Model):
         # Save the entire model instance
         self.save()
 
-    def plot_parameter_posteriors(self):
+    def _generate_parameter_posteriors_plot(self):
         if self._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
@@ -429,7 +429,7 @@ class MarketingMixModel(models.Model):
 
         return self.results['accuracy_metrics']
 
-    def plot_posterior_predictive(self):
+    def _generate_y_posterior_predictive_plot(self):
         if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
             self._load_y_posterior_predictive()
         
@@ -499,6 +499,25 @@ class MarketingMixModel(models.Model):
 
         ## Save the entire model instance
         self.save()
+
+    def _generate_all_plots(self):
+        self._generate_trace_plot()
+        self._generate_parameter_posteriors_plot()
+        self._generate_posterior_predictive_plot()
+
+    def get_plot_url(self, plot_type):
+        """Get or create a plot of the specified type."""
+        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive']:
+            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', or 'y_posterior_predictive'.")
+        
+        plot_field = f"{plot_type}_plot"
+        plot_method = getattr(self, f"_generate_{plot_type}_plot")
+
+        if not getattr(self, plot_field):
+            plot_method()
+        
+        plot_url = getattr(self, plot_field).url
+        return plot_url
 
 
 

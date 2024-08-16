@@ -100,6 +100,19 @@
           <p>No y posterior predictive plot available.</p>
         {% endif %}
       </div>
+      <!-- error percent plot -->
+      <div class="mb-5">
+        <h3 class="text-xl mb-2">Error Percent Plot</h3>
+        {% if error_percent_plot_url %}
+          <img src="{{ error_percent_plot_url }}"
+               alt="Error Percent Plot"
+               class="w-full"
+               height="400"
+               width="400">
+        {% else %}
+          <p>No error percent plot available.</p>
+        {% endif %}
+      </div>
     </div>
   {% endif %}
 {% endblock main %}

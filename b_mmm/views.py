@@ -141,6 +141,7 @@ def view_model(request):
         'trace_plot_url': recent_bayesian_mmm.get_plot_url('trace') if recent_bayesian_mmm else None,
         'parameter_posteriors_plot_url': recent_bayesian_mmm.get_plot_url('parameter_posteriors') if recent_bayesian_mmm else None,
         'y_posterior_predictive_plot_url': recent_bayesian_mmm.get_plot_url('y_posterior_predictive') if recent_bayesian_mmm else None,
+        'error_percent_plot_url': recent_bayesian_mmm.get_plot_url('error_percent') if recent_bayesian_mmm else None,
     }
 
     return render(request, 'mmm/model.html', context)

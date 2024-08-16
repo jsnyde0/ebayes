@@ -20,6 +20,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn import metrics
 import logging
+import hashlib
 
 
 from .utils import clean_currency_values, get_currency, currency_formatter
@@ -167,17 +168,22 @@ class MarketingMixModel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mmm')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    parameters = models.JSONField(default=dict)
-    results = models.JSONField(default=dict)
+    parameters = models.JSONField(default=dict, null=True, blank=True)
+    results = models.JSONField(default=dict, null=True, blank=True)
 
     # plot fields
     trace_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     parameter_posteriors_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     y_posterior_predictive_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
+    error_percent_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
 
     # computation results
     trace_binary = models.BinaryField(null=True, blank=True)
     y_posterior_predictive_binary = models.BinaryField(null=True, blank=True)
+    error_percent_binary = models.BinaryField(null=True, blank=True)
+
+
+    n_posterior_samples = models.IntegerField(default=0, null=True, blank=True)
 
     _X: Optional[pd.DataFrame] = None
     _y: Optional[pd.Series] = None
@@ -186,7 +192,7 @@ class MarketingMixModel(models.Model):
     _mmm_model: Optional[pm.Model] = None
     _trace: Optional[pm.backends.base.MultiTrace] = None
     _y_posterior_predictive: Optional[np.ndarray] = None
-
+    _error_percent: Optional[np.ndarray] = None
     def __str__(self):
         return f"MMM for {self.csv_file.file_name}"
 
@@ -209,7 +215,7 @@ class MarketingMixModel(models.Model):
         n_tune_samples = 500
         n_draw_samples = 6000
         n_chains = 4
-        n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
+        self.n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
 
         logger.info(f"Running inference with {n_draw_samples} samples and {n_chains} chains")
         self._run_inference(n_draw_samples, n_chains) # assigns self._trace
@@ -522,11 +528,12 @@ class MarketingMixModel(models.Model):
         self._generate_trace_plot()
         self._generate_parameter_posteriors_plot()
         self._generate_y_posterior_predictive_plot()
+        self._generate_error_percent_plot()
 
     def get_plot_url(self, plot_type):
         """Get or create a plot of the specified type."""
-        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive']:
-            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', or 'y_posterior_predictive'.")
+        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive', 'error_percent']:
+            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', 'y_posterior_predictive' or 'error_percent'.")
         
         plot_field = f"{plot_type}_plot"
         plot_method = getattr(self, f"_generate_{plot_type}_plot")
@@ -539,6 +546,97 @@ class MarketingMixModel(models.Model):
         
         plot_url = getattr(self, plot_field).url
         return plot_url
+    
+    def _load_error_data(self):
+        if self.error_percent_binary:
+            self._error_percent = pickle.loads(self.error_percent_binary)
+        else:
+            self._compute_error()
 
+    def _compute_error(self):
+        ## load the y_posterior_predictive if it's not already loaded
+        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
+            self._load_y_posterior_predictive()
 
+        ## load y if it's not already loaded
+        if self._y is None:
+            _, self._y = self.get_csv_file_data()
+        
+        # 1) compute the percentual error as a distribution
+        ## 1.1) to compute a distribution, we're tiling y over n_posterior_samples to subtract the posterior_predictive from it
+        ### 1.1.1 )repeat y for every sample
+        y_repeated_per_sample = np.tile(self._y, (self.n_posterior_samples, 1))
+        ### 1.1.2) deduct the posterior predictive from it to get the absolute error
+        error = y_repeated_per_sample.T - self._y_posterior_predictive
+        ### 1.1.3) divide by the actual value of y to get the relative error (and multiply by 100 to get it in %)
+        error_percent = error / y_repeated_per_sample.T * 100
+
+        ## 1.2) Replace Inf and -Inf with NaN and then drop NaN values
+        # error_percent = error_percent.replace([float('Inf'), float('-Inf')], float('NaN'))
+        self._error_percent = np.where(np.isinf(error_percent), np.nan, error_percent)
+    
+    def _generate_error_percent_plot(self):
+        # 1) compute the percentual error as a distribution
+        self._load_error_data()
+        error_percent_mean = self._error_percent.mean(axis=1)
+
+        # 2) plot
+        ### Generates 100 evenly spaced percentiles between 51% and 99%
+        n_percentiles = 50
+        percentile_ranges = np.linspace(51, 99, n_percentiles)
+
+        ## choose a colour pallete
+        palette = "YlOrRd"
+        cmap = plt.get_cmap(palette)
+
+        ## normalize the percentile range values between 0 and 1 so that it maps to the colour palette
+        color_range = (percentile_ranges - np.min(percentile_ranges)) / (np.max(percentile_ranges) - np.min(percentile_ranges))
+        color_range = np.linspace(0.1, 0.9, n_percentiles)
+
+        ## Plot the posterior mean
+        fig, ax = plt.subplots(figsize=(15, 6))
+        ax.plot(error_percent_mean, color='yellow', label='Error Mean')
+
+        ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
+        for i, percentile in enumerate(percentile_ranges[::-1]):
+            upper_percentile = np.percentile(self._error_percent, percentile, axis=1)
+            lower_percentile = np.percentile(self._error_percent, 100 - percentile, axis=1)
+            color_val = color_range[i]
+            ax.fill_between(
+                x=self.csv_file.index,
+                y1=upper_percentile,
+                y2=lower_percentile,
+                color=cmap(color_val),
+                alpha=0.1,
+            )
+
+        ## Rotate x-axis labels
+        ax.set_xticklabels(self.csv_file.index, rotation=45, ha='right')
+
+        ## format the title, legend and annotate the R Squared onto the plot
+        ax.set_title('Error [%] of forecast vs real', y=1.12)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=3)
+
+        ## format the x- and y-axis
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Error [%]')
+        ax.set_ylim(-100, 100)
+
+        # Add reference lines at 0%, +10% and -10%
+        plt.axhline(y=0, color='black', linestyle='-', linewidth=1.0)
+        plt.axhline(y=10, color='black', linestyle='--', linewidth=1.0)
+        plt.axhline(y=-10, color='black', linestyle='--', linewidth=1.0)
+
+        mean_absolute_error = round(abs(error_percent_mean).mean(), 1)
+        ax.annotate(f'Mean Absolute Error:  {mean_absolute_error}%', xycoords='axes fraction', xy=[0.03, 0.92])
+
+        # 3) Save the plot
+        ## Save to an in-memory buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        plt.close(fig)
+
+        ## Save the plot directly from the buffer to the ImageField
+        self.error_percent_plot.save(f'error_percent_plot_{self.id}.png', ContentFile(buffer.getvalue()), save=True)
 

@@ -30,8 +30,8 @@
       <!-- trace plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Trace Plot</h3>
-        {% if mmm.trace_plot %}
-          <img src="{{ mmm.trace_plot.url }}"
+        {% if trace_plot_url %}
+          <img src="{{ trace_plot_url }}"
                alt="Trace Plot"
                class="w-full"
                height="400"
@@ -43,8 +43,8 @@
       <!-- parameter posteriors plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Parameter Posteriors Plot</h3>
-        {% if mmm.parameter_posteriors_plot %}
-          <img src="{{ mmm.parameter_posteriors_plot.url }}"
+        {% if parameter_posteriors_plot_url %}
+          <img src="{{ parameter_posteriors_plot_url }}"
                alt="Parameter Posteriors Plot"
                class="w-full"
                height="400"
@@ -112,8 +112,8 @@
       <!-- y posterior predictive plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Y Posterior Predictive Plot</h3>
-        {% if mmm.y_posterior_predictive_plot %}
-          <img src="{{ mmm.y_posterior_predictive_plot.url }}"
+        {% if y_posterior_predictive_plot_url %}
+          <img src="{{ y_posterior_predictive_plot_url }}"
                alt="Y Posterior Predictive Plot"
                class="w-full"
                height="400"

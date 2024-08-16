@@ -125,7 +125,10 @@ def view_model(request):
 
         context = {
             'csv_files': csv_files,
-            'mmm': mmm
+            'mmm': mmm,
+            'trace_plot_url': mmm.trace_plot.url,
+            'parameter_posteriors_plot_url': mmm.parameter_posteriors_plot.url,
+            'y_posterior_predictive_plot_url': mmm.y_posterior_predictive_plot.url,
         }
         
         return render(request, 'mmm/model.html', context)
@@ -136,7 +139,10 @@ def view_model(request):
     
     context = {
         'csv_files': csv_files,
-        'mmm': recent_bayesian_mmm
+        'mmm': recent_bayesian_mmm,
+        'trace_plot_url': recent_bayesian_mmm.trace_plot.url,
+        'parameter_posteriors_plot_url': recent_bayesian_mmm.parameter_posteriors_plot.url,
+        'y_posterior_predictive_plot_url': recent_bayesian_mmm.y_posterior_predictive_plot.url,
     }
 
     return render(request, 'mmm/model.html', context)

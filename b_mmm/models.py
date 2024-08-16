@@ -19,12 +19,15 @@ from typing import List, Optional, Dict, Tuple
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn import metrics
+import logging
 
 
 from .utils import clean_currency_values, get_currency, currency_formatter
 
 import matplotlib
 matplotlib.use('Agg') # because TKinter backend is not thread-safe
+
+logger = logging.getLogger(__name__)
 
 # Constants
 CSV_UPLOAD_DIR = 'csv_files'
@@ -191,10 +194,12 @@ class MarketingMixModel(models.Model):
         return self.csv_file.predictors, self.csv_file.sales
 
     def run_model(self):
+        logger.info(f"Starting model run for MMM {self.id}")
         if self.trace_binary and self.y_posterior_predictive_binary:
             self._load_saved_results()
             return
         
+        logger.info(f"Computing new results for MMM {self.id}")
         # Scale X and y
         self._X, self._y = self.get_csv_file_data()
         X_scaled, y_scaled = self._scale_data(self._X, self._y)
@@ -206,17 +211,29 @@ class MarketingMixModel(models.Model):
         n_chains = 4
         n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
 
+        logger.info(f"Running inference with {n_draw_samples} samples and {n_chains} chains")
         self._run_inference(n_draw_samples, n_chains) # assigns self._trace
 
+        logger.info(f"Computing y posterior predictive for MMM {self.id}")
         self._compute_y_posterior_predictive()
 
+        logger.info(f"Computing accuracy metrics for MMM {self.id}")
+        self._compute_accuracy_metrics()
+
+        logger.info(f"Generating all plots for MMM {self.id}")
+        self._generate_all_plots()
+
+        logger.info(f"Saving results for MMM {self.id}")
         self._save_results()
+        logger.info(f"Model run completed for MMM {self.id}")
 
     def _load_saved_results(self):
+        logger.info(f"Loading saved trace and y_posterior_predictive for MMM {self.id}")
         self._trace = pickle.loads(self.trace_binary)
         self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
 
     def _save_results(self):
+        logger.info(f"Saving trace and y_posterior_predictive for MMM {self.id}")
         self.trace_binary = pickle.dumps(self._trace)
         self.y_posterior_predictive_binary = pickle.dumps(self._y_posterior_predictive)
         self.save()
@@ -300,6 +317,7 @@ class MarketingMixModel(models.Model):
     
     def _run_inference(self, n_draw_samples: int = 6000, n_chains: int = 4):
         if self._mmm_model is None:
+            logger.error("No model found. Please run the model first.")
             raise ValueError("No model found. Please run the model first.")
         
         self._trace = pm.sample(
@@ -398,7 +416,7 @@ class MarketingMixModel(models.Model):
         ## unscale it back to original y-value space
         self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
 
-    def compute_accuracy_metrics(self):
+    def _compute_accuracy_metrics(self):
         if 'accuracy_metrics' in self.results:
             return self.results['accuracy_metrics']
 
@@ -503,7 +521,7 @@ class MarketingMixModel(models.Model):
     def _generate_all_plots(self):
         self._generate_trace_plot()
         self._generate_parameter_posteriors_plot()
-        self._generate_posterior_predictive_plot()
+        self._generate_y_posterior_predictive_plot()
 
     def get_plot_url(self, plot_type):
         """Get or create a plot of the specified type."""
@@ -514,7 +532,10 @@ class MarketingMixModel(models.Model):
         plot_method = getattr(self, f"_generate_{plot_type}_plot")
 
         if not getattr(self, plot_field):
+            logger.info(f"Generating new {plot_type} plot for MMM {self.id}")
             plot_method()
+        else:
+            logger.info(f"Using existing {plot_type} plot for MMM {self.id}")
         
         plot_url = getattr(self, plot_field).url
         return plot_url

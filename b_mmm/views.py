@@ -115,17 +115,14 @@ def view_model(request):
 
         try:
             mmm.run_model()
-            mmm.plot_trace()
-            mmm.plot_parameter_posteriors()
-            mmm.plot_posterior_predictive()
-            mmm.compute_accuracy_metrics()
             messages.success(request, "Model run successfully.")
         except Exception as e:
             messages.error(request, f"Error running model: {str(e)}")
 
         context = {
             'csv_files': csv_files,
-            'mmm': mmm,
+            'mmm_results_exist': mmm is not None,
+            'mmm_accuracy_metrics': mmm.results['accuracy_metrics'] if mmm else None,
             'trace_plot_url': mmm.get_plot_url('trace'),
             'parameter_posteriors_plot_url': mmm.get_plot_url('parameter_posteriors'),
             'y_posterior_predictive_plot_url': mmm.get_plot_url('y_posterior_predictive'),
@@ -139,7 +136,7 @@ def view_model(request):
     
     context = {
         'csv_files': csv_files,
-        'mmm_exists': recent_bayesian_mmm is not None,
+        'mmm_results_exist': recent_bayesian_mmm is not None,
         'mmm_accuracy_metrics': recent_bayesian_mmm.results['accuracy_metrics'] if recent_bayesian_mmm else None,
         'trace_plot_url': recent_bayesian_mmm.get_plot_url('trace') if recent_bayesian_mmm else None,
         'parameter_posteriors_plot_url': recent_bayesian_mmm.get_plot_url('parameter_posteriors') if recent_bayesian_mmm else None,

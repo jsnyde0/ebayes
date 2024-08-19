@@ -97,7 +97,6 @@ def view_model(request):
 
     if request.method == 'POST':
         file_id = request.POST.get('file_id')
-        model_type = request.POST.get('model_type')
 
         if not file_id:
             messages.error(request, "Missing required fields.")
@@ -114,7 +113,7 @@ def view_model(request):
         )
 
         try:
-            mmm.run_model()
+            mmm.fit_model_and_evaluate()
             messages.success(request, "Model run successfully.")
         except Exception as e:
             messages.error(request, f"Error running model: {str(e)}")

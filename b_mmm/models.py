@@ -9,7 +9,6 @@ import pymc as pm
 import arviz as az
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
-import base64
 import csv
 import io
 import os
@@ -178,6 +177,7 @@ class MarketingMixModel(models.Model):
     error_percent_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
 
     # computation results
+    state = models.CharField(max_length=20, default='initialized')
     trace_binary = models.BinaryField(null=True, blank=True)
     y_posterior_predictive_binary = models.BinaryField(null=True, blank=True)
     error_percent_binary = models.BinaryField(null=True, blank=True)
@@ -193,22 +193,40 @@ class MarketingMixModel(models.Model):
     _trace: Optional[pm.backends.base.MultiTrace] = None
     _y_posterior_predictive: Optional[np.ndarray] = None
     _error_percent: Optional[np.ndarray] = None
+
     def __str__(self):
-        return f"MMM for {self.csv_file.file_name}"
+        return f"MMM {self.id} for {self.csv_file.file_name}"
 
-    def get_csv_file_data(self) -> Tuple[pd.DataFrame, pd.Series]:
-        return self.csv_file.predictors, self.csv_file.sales
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.plotter = MMModelPlotter(self)
 
-    def run_model(self):
+    @property
+    def y(self):
+        if self._y is None:
+            self._y = self.csv_file.sales
+        return self._y
+
+    @property
+    def X(self):
+        if self._X is None:
+            self._X = self.csv_file.predictors
+        return self._X
+    
+    def _update_state(self, new_state):
+        self.state = new_state
+        self.save()
+
+    def fit_model_and_evaluate(self):
         logger.info(f"Starting model run for MMM {self.id}")
-        if self.trace_binary and self.y_posterior_predictive_binary:
+        if self.state == 'completed':
             self._load_saved_results()
             return
         
+        self._update_state('building')
         logger.info(f"Computing new results for MMM {self.id}")
         # Scale X and y
-        self._X, self._y = self.get_csv_file_data()
-        X_scaled, y_scaled = self._scale_data(self._X, self._y)
+        X_scaled, y_scaled = self._scale_data(self.X, self.y)
         self._mmm_model = self._build_bayesian_model(X_scaled, y_scaled)
 
         # Run Inference
@@ -217,18 +235,22 @@ class MarketingMixModel(models.Model):
         n_chains = 4
         self.n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
 
+        self._update_state('inferencing')
         logger.info(f"Running inference with {n_draw_samples} samples and {n_chains} chains")
         self._run_inference(n_draw_samples, n_chains) # assigns self._trace
 
+        self._update_state('evaluating')
         logger.info(f"Computing y posterior predictive for MMM {self.id}")
         self._compute_y_posterior_predictive()
 
         logger.info(f"Computing accuracy metrics for MMM {self.id}")
         self._compute_accuracy_metrics()
 
+        self._update_state('plotting')
         logger.info(f"Generating all plots for MMM {self.id}")
         self._generate_all_plots()
 
+        self._update_state('completed')
         logger.info(f"Saving results for MMM {self.id}")
         self._save_results()
         logger.info(f"Model run completed for MMM {self.id}")
@@ -241,7 +263,7 @@ class MarketingMixModel(models.Model):
     def _save_results(self):
         logger.info(f"Saving trace and y_posterior_predictive for MMM {self.id}")
         self.trace_binary = pickle.dumps(self._trace)
-        self.y_posterior_predictive_binary = pickle.dumps(self._y_posterior_predictive)
+        self.y_posterior_predictive_binary = pickle.dumps(self.y_posterior_predictive)
         self.save()
     
     def _scale_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
@@ -335,15 +357,144 @@ class MarketingMixModel(models.Model):
         )
         # return self._trace
 
+    def _load_y_posterior_predictive(self):
+        if self._y_posterior_predictive is None:
+            if self.y_posterior_predictive_binary:
+                self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
+            else:
+                self._compute_y_posterior_predictive()
+    
+    def _compute_y_posterior_predictive(self):
+        if self.state in ['building', 'inferencing']:
+            raise ValueError("Model must be run before computing y_posterior_predictive.")
+    
+        if self._trace is None or self._mmm_model is None or self._y_scaler is None:
+            raise ValueError("Required model components are missing. Please run the model first.")
+        
+        try:
+            # sample the posterior predictive
+            model_posterior_predictive = pm.sample_posterior_predictive(
+                trace=self._trace,
+                model=self._mmm_model
+            )
+
+            # extract the posterior predictive for y (remember that y is scaled)
+            y_scaled_posterior_predictive = az.extract(
+                data=model_posterior_predictive,
+                group="posterior_predictive",
+                var_names="y_observed",
+            )
+
+            ## unscale it back to original y-value space
+            self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
+        except Exception as e:
+            logger.error(f"Error computing y_posterior_predictive: {e}")
+            raise e
+
+    @property
+    def y_posterior_predictive(self):
+        if self._y_posterior_predictive is None:
+            self._load_y_posterior_predictive()
+        return self._y_posterior_predictive
+
+    def _compute_accuracy_metrics(self):
+        if 'accuracy_metrics' in self.results:
+            return self.results['accuracy_metrics']
+
+        # compute mean
+        y_posterior_mean = self.y_posterior_predictive.mean(axis=1)
+
+        # compute accuracy metrics
+        r_squared = round(metrics.r2_score(self.y, y_posterior_mean), 3)
+        mse = metrics.mean_squared_error(self.y, y_posterior_mean)
+        rmse = round(np.sqrt(mse))
+        y_mean = np.mean(self.y)
+        nrmse = round(rmse/y_mean*100, 1)
+        mape = round(metrics.mean_absolute_error(self.y, y_posterior_mean)/y_mean * 100,1)
+
+        self.results['accuracy_metrics'] = {
+            'r_squared': r_squared,
+            'mse': mse,
+            'rmse': rmse,
+            'y_mean': np.mean(self.y),
+            'nrmse': nrmse,
+            'mape': mape
+        }
+
+        self.save()
+
+        return self.results['accuracy_metrics']
+
+    def _generate_all_plots(self):
+        self.plotter.generate_all_plots()
+
+    def get_plot_url(self, plot_type):
+        return self.plotter.get_plot_url(plot_type)
+    
+    @property
+    def error_percent(self):
+        if self._error_percent is None:
+            self._load_error_data()
+        return self._error_percent
+    
+    def _load_error_data(self):
+        if self.error_percent_binary:
+            self._error_percent = pickle.loads(self.error_percent_binary)
+        else:
+            self._compute_error()
+
+    def _compute_error(self):
+        
+        # 1) compute the percentual error as a distribution
+        ## 1.1) to compute a distribution, we're tiling y over n_posterior_samples to subtract the posterior_predictive from it
+        ### 1.1.1 )repeat y for every sample
+        y_repeated_per_sample = np.tile(self.y, (self.n_posterior_samples, 1))
+        ### 1.1.2) deduct the posterior predictive from it to get the absolute error
+        error = y_repeated_per_sample.T - self.y_posterior_predictive
+        ### 1.1.3) divide by the actual value of y to get the relative error (and multiply by 100 to get it in %)
+        error_percent = error / y_repeated_per_sample.T * 100
+
+        ## 1.2) Replace Inf and -Inf with NaN and then drop NaN values
+        # error_percent = error_percent.replace([float('Inf'), float('-Inf')], float('NaN'))
+        self._error_percent = np.where(np.isinf(error_percent), np.nan, error_percent)
+
+class MMModelPlotter:
+    def __init__(self, model):
+        self.model = model
+
+    def generate_all_plots(self):
+        self._generate_trace_plot()
+        self._generate_parameter_posteriors_plot()
+        self._generate_y_posterior_predictive_plot()
+        self._generate_error_percent_plot()
+
+    def get_plot_url(self, plot_type):
+        """Get or create a plot of the specified type."""
+        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive', 'error_percent']:
+            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', 'y_posterior_predictive' or 'error_percent'.")
+        
+        plot_field = f"{plot_type}_plot"
+        plot_method = getattr(self, f"_generate_{plot_type}_plot")
+
+        if not getattr(self.model, plot_field):
+            logger.info(f"Generating new {plot_type} plot for MMM {self.model.id}")
+            plot_method()
+        else:
+            logger.info(f"Using existing {plot_type} plot for MMM {self.model.id}")
+        
+        plot_url = getattr(self.model, plot_field).url
+        return plot_url
+
+    # Add the plotting methods here
     def _generate_trace_plot(self):
-        if self._trace is None:
+        if self.model._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
         var_names_to_plot = ["intercept", "predictor_coefficients", "sigma", "degrees_freedom"]
         n_vars = len(var_names_to_plot)
 
         axes = az.plot_trace(
-            self._trace,
+            self.model._trace,
             var_names=var_names_to_plot,
             figsize=(15, 4*n_vars)
         )
@@ -357,23 +508,20 @@ class MarketingMixModel(models.Model):
         plt.close(fig)
 
         # Save the plot directly from the buffer to the ImageField
-        self.trace_plot.save(f'trace_plot.png', ContentFile(buffer.getvalue()), save=True)
-
-        # Save the entire model instance
-        self.save()
+        self.model.trace_plot.save(f'trace_plot.png', ContentFile(buffer.getvalue()), save=True)
 
     def _generate_parameter_posteriors_plot(self):
-        if self._trace is None:
+        if self.model._trace is None:
             raise ValueError("No trace found. Please run the model first.")
 
         var_names_to_plot = ["intercept", "predictor_coefficients", "sigma"]
         n_vars = len(var_names_to_plot)
 
         axes = az.plot_posterior(
-				self._trace
-				, var_names=var_names_to_plot
-				, figsize=(15,4*n_vars) # 4 times the number of variable names
-			);
+            self.model._trace,
+            var_names=var_names_to_plot,
+            figsize=(15,4*n_vars) # 4 times the number of variable names
+        );
         fig = axes.ravel()[0].figure
 
         # Save to an in-memory buffer
@@ -384,81 +532,12 @@ class MarketingMixModel(models.Model):
         plt.close(fig)
 
         # Save the plot directly from the buffer to the ImageField
-        self.parameter_posteriors_plot.save(f'parameter_posteriors_plot.png', ContentFile(buffer.getvalue()), save=True)
-
-        # Save the entire model instance
-        self.save()
-
-    def _load_y_posterior_predictive(self):
-        if self._y_posterior_predictive is None:
-            if self.y_posterior_predictive_binary:
-                self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
-            else:
-                self.run_model()
-    
-    def _compute_y_posterior_predictive(self):
-        if self._trace is None:
-            raise ValueError("No trace found. Please run the model first.")
-        
-        if self._mmm_model is None:
-            raise ValueError("No model found. Please run the model first.")
-
-        if self._y_scaler is None:
-            raise ValueError("No y scaler found. Please run the model first.")
-        
-        # sample the posterior predictive
-        model_posterior_predictive = pm.sample_posterior_predictive(
-            trace=self._trace,
-            model=self._mmm_model
-        )
-
-        # extract the posterior predictive for y (remember that y is scaled)
-        y_scaled_posterior_predictive = az.extract(
-            data=model_posterior_predictive,
-            group="posterior_predictive",
-            var_names="y_observed",
-        )
-
-        ## unscale it back to original y-value space
-        self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
-
-    def _compute_accuracy_metrics(self):
-        if 'accuracy_metrics' in self.results:
-            return self.results['accuracy_metrics']
-
-        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
-            self._load_y_posterior_predictive()
-
-        # compute mean
-        y_posterior_mean = self._y_posterior_predictive.mean(axis=1)
-
-        # compute accuracy metrics
-        r_squared = round(metrics.r2_score(self._y, y_posterior_mean), 3)
-        mse = metrics.mean_squared_error(self._y, y_posterior_mean)
-        rmse = round(np.sqrt(mse))
-        y_mean = np.mean(self._y)
-        nrmse = round(rmse/y_mean*100, 1)
-        mape = round(metrics.mean_absolute_error(self._y, y_posterior_mean)/y_mean * 100,1)
-
-        self.results['accuracy_metrics'] = {
-            'r_squared': r_squared,
-            'mse': mse,
-            'rmse': rmse,
-            'y_mean': np.mean(self._y),
-            'nrmse': nrmse,
-            'mape': mape
-        }
-
-        self.save()
-
-        return self.results['accuracy_metrics']
+        self.model.parameter_posteriors_plot.save(f'parameter_posteriors_plot.png', ContentFile(buffer.getvalue()), save=True)
 
     def _generate_y_posterior_predictive_plot(self):
-        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
-            self._load_y_posterior_predictive()
         
-        if self._y is None:
-            _, self._y = self.get_csv_file_data()
+        if self.model._y is None:
+            _, self.model._y = self.model.get_csv_file_data()
         
         # 1) set up percentile ranges and a colour map we'll use for plotting posterior distributions
 
@@ -477,21 +556,21 @@ class MarketingMixModel(models.Model):
         # 2) Plot
 
         ## compute the posterior mean
-        y_posterior_mean = self._y_posterior_predictive.mean(axis=1)
+        y_posterior_mean = self.model.y_posterior_predictive.mean(axis=1)
 
         ## Plot the posterior mean
         fig, ax = plt.subplots(figsize=(15, 6))
         # plt.figure(figsize=(15, 6))
-        ax.plot(self._y, color='k', label='Actual')
+        ax.plot(self.model._y, color='k', label='Actual')
         ax.plot(y_posterior_mean, color='turquoise', label='Posterior Mean')
 
         ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
         for i, percentile in enumerate(percentile_ranges[::-1]):
-            upper_percentile = np.percentile(self._y_posterior_predictive, percentile, axis=1)
-            lower_percentile = np.percentile(self._y_posterior_predictive, 100 - percentile, axis=1)
+            upper_percentile = np.percentile(self.model.y_posterior_predictive, percentile, axis=1)
+            lower_percentile = np.percentile(self.model.y_posterior_predictive, 100 - percentile, axis=1)
             color_val = color_range[i]
             ax.fill_between(
-                x=self.csv_file.index,
+                x=self.model._y.index,
                 y1=upper_percentile,
                 y2=lower_percentile,
                 color=cmap(color_val),
@@ -499,7 +578,7 @@ class MarketingMixModel(models.Model):
             )
 
         ## Rotate x-axis labels
-        ax.set_xticklabels(self.csv_file.index, rotation=45, ha='right')
+        ax.set_xticklabels(self.model.csv_file.index, rotation=45, ha='right')
 
         ## format the title, legend and annotate the R Squared onto the plot
         ax.set_title('Sales - Real vs Forecast', y=1.12)
@@ -508,7 +587,7 @@ class MarketingMixModel(models.Model):
         ## format the x- and y-axis
         ax.set_xlabel('Date')
         ax.yaxis.set_major_formatter(FuncFormatter(currency_formatter))
-        ax.set_ylabel(f'Sales [{self.csv_file.currency}]')
+        ax.set_ylabel(f'Sales [{self.model.csv_file.currency}]')
 
         # 3) Save the plot
 
@@ -519,66 +598,11 @@ class MarketingMixModel(models.Model):
         plt.close(fig)
 
         ## Save the plot directly from the buffer to the ImageField
-        self.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot.png', ContentFile(buffer.getvalue()), save=True)
+        self.model.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot.png', ContentFile(buffer.getvalue()), save=True)
 
-        ## Save the entire model instance
-        self.save()
-
-    def _generate_all_plots(self):
-        self._generate_trace_plot()
-        self._generate_parameter_posteriors_plot()
-        self._generate_y_posterior_predictive_plot()
-        self._generate_error_percent_plot()
-
-    def get_plot_url(self, plot_type):
-        """Get or create a plot of the specified type."""
-        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive', 'error_percent']:
-            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', 'y_posterior_predictive' or 'error_percent'.")
-        
-        plot_field = f"{plot_type}_plot"
-        plot_method = getattr(self, f"_generate_{plot_type}_plot")
-
-        if not getattr(self, plot_field):
-            logger.info(f"Generating new {plot_type} plot for MMM {self.id}")
-            plot_method()
-        else:
-            logger.info(f"Using existing {plot_type} plot for MMM {self.id}")
-        
-        plot_url = getattr(self, plot_field).url
-        return plot_url
-    
-    def _load_error_data(self):
-        if self.error_percent_binary:
-            self._error_percent = pickle.loads(self.error_percent_binary)
-        else:
-            self._compute_error()
-
-    def _compute_error(self):
-        ## load the y_posterior_predictive if it's not already loaded
-        if self._y_posterior_predictive is None or self._y_posterior_predictive.size == 0:
-            self._load_y_posterior_predictive()
-
-        ## load y if it's not already loaded
-        if self._y is None:
-            _, self._y = self.get_csv_file_data()
-        
-        # 1) compute the percentual error as a distribution
-        ## 1.1) to compute a distribution, we're tiling y over n_posterior_samples to subtract the posterior_predictive from it
-        ### 1.1.1 )repeat y for every sample
-        y_repeated_per_sample = np.tile(self._y, (self.n_posterior_samples, 1))
-        ### 1.1.2) deduct the posterior predictive from it to get the absolute error
-        error = y_repeated_per_sample.T - self._y_posterior_predictive
-        ### 1.1.3) divide by the actual value of y to get the relative error (and multiply by 100 to get it in %)
-        error_percent = error / y_repeated_per_sample.T * 100
-
-        ## 1.2) Replace Inf and -Inf with NaN and then drop NaN values
-        # error_percent = error_percent.replace([float('Inf'), float('-Inf')], float('NaN'))
-        self._error_percent = np.where(np.isinf(error_percent), np.nan, error_percent)
-    
     def _generate_error_percent_plot(self):
         # 1) compute the percentual error as a distribution
-        self._load_error_data()
-        error_percent_mean = self._error_percent.mean(axis=1)
+        error_percent_mean = self.model.error_percent.mean(axis=1)
 
         # 2) plot
         ### Generates 100 evenly spaced percentiles between 51% and 99%
@@ -599,11 +623,11 @@ class MarketingMixModel(models.Model):
 
         ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
         for i, percentile in enumerate(percentile_ranges[::-1]):
-            upper_percentile = np.percentile(self._error_percent, percentile, axis=1)
-            lower_percentile = np.percentile(self._error_percent, 100 - percentile, axis=1)
+            upper_percentile = np.percentile(self.model.error_percent, percentile, axis=1)
+            lower_percentile = np.percentile(self.model.error_percent, 100 - percentile, axis=1)
             color_val = color_range[i]
             ax.fill_between(
-                x=self.csv_file.index,
+                x=self.model.csv_file.index,
                 y1=upper_percentile,
                 y2=lower_percentile,
                 color=cmap(color_val),
@@ -611,7 +635,7 @@ class MarketingMixModel(models.Model):
             )
 
         ## Rotate x-axis labels
-        ax.set_xticklabels(self.csv_file.index, rotation=45, ha='right')
+        ax.set_xticklabels(self.model.csv_file.index, rotation=45, ha='right')
 
         ## format the title, legend and annotate the R Squared onto the plot
         ax.set_title('Error [%] of forecast vs real', y=1.12)
@@ -638,5 +662,4 @@ class MarketingMixModel(models.Model):
         plt.close(fig)
 
         ## Save the plot directly from the buffer to the ImageField
-        self.error_percent_plot.save(f'error_percent_plot_{self.id}.png', ContentFile(buffer.getvalue()), save=True)
-
+        self.model.error_percent_plot.save(f'error_percent_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)

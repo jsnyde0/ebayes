@@ -4,25 +4,18 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 
 import pandas as pd
-import numpy as np
-import pymc as pm
 import arviz as az
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import csv
 import io
 import os
 import uuid
-import pickle
-from typing import List, Optional, Dict, Tuple
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import MaxAbsScaler
-from sklearn import metrics
+from pymc_marketing.mmm import MMM, GeometricAdstock, LogisticSaturation
+from typing import List, Optional, Dict
 import logging
-import hashlib
 
 
-from .utils import clean_currency_values, get_currency, currency_formatter
+from .utils import clean_currency_values, get_currency, save_model_to_file_field, load_model_from_file_field
 
 import matplotlib
 matplotlib.use('Agg') # because TKinter backend is not thread-safe
@@ -38,6 +31,9 @@ def get_file_path(instance: 'CSVFile', filename: str) -> str:
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join(CSV_UPLOAD_DIR, filename)
+
+def get_model_path(instance: 'MarketingMixModel', filename: str) -> str:
+    return f'mmm_models/mmm_{instance.id}.nc'
 
 def get_plot_path(instance: 'MarketingMixModel', filename: str) -> str:
     """Generate a unique file path for plot images."""
@@ -167,32 +163,19 @@ class MarketingMixModel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mmm')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    parameters = models.JSONField(default=dict, null=True, blank=True)
-    results = models.JSONField(default=dict, null=True, blank=True)
+    state = models.CharField(max_length=20, default='initialized')
 
     # plot fields
     trace_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
-    parameter_posteriors_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     y_posterior_predictive_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
     error_percent_plot = models.ImageField(upload_to=get_plot_path, null=True, blank=True)
-
+    
     # computation results
-    state = models.CharField(max_length=20, default='initialized')
-    trace_binary = models.BinaryField(null=True, blank=True)
-    y_posterior_predictive_binary = models.BinaryField(null=True, blank=True)
-    error_percent_binary = models.BinaryField(null=True, blank=True)
-
-
-    n_posterior_samples = models.IntegerField(default=0, null=True, blank=True)
+    saved_mmm = models.FileField(upload_to=get_model_path, null=True, blank=True)
 
     _X: Optional[pd.DataFrame] = None
     _y: Optional[pd.Series] = None
-    # _model: Optional[LinearRegression] = None
-    _y_scaler: Optional[MaxAbsScaler] = None
-    _mmm_model: Optional[pm.Model] = None
-    _trace: Optional[pm.backends.base.MultiTrace] = None
-    _y_posterior_predictive: Optional[np.ndarray] = None
-    _error_percent: Optional[np.ndarray] = None
+    _mmm: Optional[MMM] = None
 
     def __str__(self):
         return f"MMM {self.id} for {self.csv_file.file_name}"
@@ -226,25 +209,14 @@ class MarketingMixModel(models.Model):
         self._update_state('building')
         logger.info(f"Computing new results for MMM {self.id}")
         # Scale X and y
-        X_scaled, y_scaled = self._scale_data(self.X, self.y)
-        self._mmm_model = self._build_bayesian_model(X_scaled, y_scaled)
+        self._mmm = self._build_bayesian_model()
 
         # Run Inference
-        n_tune_samples = 500
         n_draw_samples = 6000
         n_chains = 4
-        self.n_posterior_samples = n_draw_samples * n_chains # for each trace, we drew 'n_draw_samples' samples
-
         self._update_state('inferencing')
         logger.info(f"Running inference with {n_draw_samples} samples and {n_chains} chains")
-        self._run_inference(n_draw_samples, n_chains) # assigns self._trace
-
-        self._update_state('evaluating')
-        logger.info(f"Computing y posterior predictive for MMM {self.id}")
-        self._compute_y_posterior_predictive()
-
-        logger.info(f"Computing accuracy metrics for MMM {self.id}")
-        self._compute_accuracy_metrics()
+        self._run_inference(n_draw_samples, n_chains)
 
         self._update_state('plotting')
         logger.info(f"Generating all plots for MMM {self.id}")
@@ -254,209 +226,67 @@ class MarketingMixModel(models.Model):
         logger.info(f"Saving results for MMM {self.id}")
         self._save_results()
         logger.info(f"Model run completed for MMM {self.id}")
-
+    
+    def _save_results(self):
+        logger.info(f"Saving MMM model for instance {self.id}")
+        if self._mmm is None:
+            raise ValueError("No model found. Please run the model first.")
+        save_model_to_file_field(self._mmm, self.saved_mmm, f'mmm_{self.id}.nc')
+    
     def _load_saved_results(self):
         logger.info(f"Loading saved trace and y_posterior_predictive for MMM {self.id}")
-        self._trace = pickle.loads(self.trace_binary)
-        self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
+        if not self.saved_mmm:
+            logger.error("No saved model file found.")
+            return
+        
+        self._mmm = load_model_from_file_field(MMM, self.mmm_file)
 
-    def _save_results(self):
-        logger.info(f"Saving trace and y_posterior_predictive for MMM {self.id}")
-        self.trace_binary = pickle.dumps(self._trace)
-        self.y_posterior_predictive_binary = pickle.dumps(self.y_posterior_predictive)
-        self.save()
-    
-    def _scale_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
-        self._y_scaler = MaxAbsScaler()
-        X_scaler = MaxAbsScaler()
-        y_scaled = self._y_scaler.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()
-        X_scaled = X_scaler.fit_transform(X.to_numpy())
-        return X_scaled, y_scaled
-    
-    def _build_bayesian_model(self, X_scaled: np.ndarray, y_scaled: np.ndarray) -> pm.Model:
-        x_names = self.csv_file.predictor_names
+    def _build_bayesian_model(self) -> MMM:        
+        my_sampler_config = {"progressbar": True}
 
-        # Define the model
-        ## define coordinates for clarity and ease of analysis
-        dates = self.csv_file.index.to_numpy()
-        n_dates = len(dates)
-        coords = {"date": dates, "predictor": x_names}
+        my_model_config = {
+            "intercept": {
+                "dist": "HalfNormal",
+                "kwargs": {"sigma": 2},
+            },
+        }
 
-        ## set up scaled linear feature that represents the timeframe
-        ## because we want to model a trend (independent of the predictors), we'll set up a linear feature scaled between 0 and 1
-        # time_linear_0_to_1 = ((abt.index - abt.index.min()) / (abt.index.max() - abt.index.min())).to_numpy()
-        time_linear_0_to_1 = np.linspace(0, 1, n_dates)
-
-        ## set up model definition
-        with pm.Model(coords=coords) as model:
-            ## 1. Add coordinates to model
-            model.add_coord(name="date", values=dates)
-            model.add_coord(name="predictor", values=x_names)
-
-            ## 1. data container for our predictors
-            predictor_values = pm.MutableData(name="predictor_values", value=X_scaled, dims=("date", "predictor"))
-
-            ## 2. Trend
-            ### let's capture the trend a linear line (an intercept and a slope)
-            # intercept = pm.Normal(name="intercept", mu=0, sigma=4) # use this one if you also have a slope, perhaps?
-            intercept = pm.HalfNormal('intercept', sigma=4)
-            slope = pm.Normal(name="slope", mu=0, sigma=2)
-            # t_tensor = pt.tensor(dtype='float32', shape=(58,), name='myvar')
-            trend = pm.Deterministic(name="trend", var=intercept + slope * time_linear_0_to_1, dims="date")
-
-            ## 3. Predictor / Channel Coefficients
-            ### Define priors for the coefficients of the transformed predictors
-            # predictor_coefficients = pm.HalfNormal('predictor_coefficients', sigma=2, shape=n_predictors)
-            predictor_coefficients = pm.HalfNormal('predictor_coefficients', sigma=2, dims="predictor") # don't need the shape argument because it's derived from the dims argument
-            ### predictor effect
-            predictor_effect = pm.Deterministic(
-                name="predictor_effect",
-                var=pm.math.dot(predictor_values, predictor_coefficients),
-                dims=("date")
-            )
-            
-            ## 4. Sales (captured by a StudentT distribution for robustness against outliers)
-            ### 4.1 Expected value of StudentT
-            y_mu = pm.Deterministic(
-                name="y_mu",
-                var=intercept + predictor_effect,
-                dims="date"
-            )
-            
-            ### 4.2 Standard deviation of the StudentT
-            sigma = pm.HalfCauchy('sigma', beta=1)
-            ### 4.3 Degrees of freedom of the StudentT
-            degrees_freedom = pm.Gamma(name="degrees_freedom", alpha=25, beta=2)
-            
-            ### 4.4 Putting it together in the StudenT likelihood function
-            y_observed = pm.StudentT(
-                name="y_observed", 
-                nu=degrees_freedom, 
-                mu=y_mu, sigma=sigma, 
-                observed=y_scaled,
-                dims="date"
-            )
-            # y_observed = pm.Normal('Y_obs', mu=y_mu, sigma=residual_sigma, observed=y_scaled)
+        model = MMM(
+            model_config=my_model_config,
+            sampler_config=my_sampler_config,
+            date_column="date_week",
+            adstock=GeometricAdstock(l_max=8),
+            saturation=LogisticSaturation(),
+            channel_columns=self.csv_file.predictor_names,
+            # control_columns=[
+            #     "event_1",
+            #     "event_2",
+            #     "t",
+            # ],
+            yearly_seasonality=1,
+        )
 
         return model
     
-    def _visualize_model(self):
-        return pm.model_to_graphviz(self._mmm_model)
-    
     def _run_inference(self, n_draw_samples: int = 6000, n_chains: int = 4):
-        if self._mmm_model is None:
+        if self._mmm is None:
             logger.error("No model found. Please run the model first.")
             raise ValueError("No model found. Please run the model first.")
         
-        self._trace = pm.sample(
-            model=self._mmm_model,
-            nuts_sampler="numpyro",
-            draws=n_draw_samples,
-            chains=n_chains,
-            idata_kwargs={"log_likelihood": True},
-        )
-        # return self._trace
-
-    def _load_y_posterior_predictive(self):
-        if self._y_posterior_predictive is None:
-            if self.y_posterior_predictive_binary:
-                self._y_posterior_predictive = pickle.loads(self.y_posterior_predictive_binary)
-            else:
-                self._compute_y_posterior_predictive()
-    
-    def _compute_y_posterior_predictive(self):
-        if self.state in ['building', 'inferencing']:
-            raise ValueError("Model must be run before computing y_posterior_predictive.")
-    
-        if self._trace is None or self._mmm_model is None or self._y_scaler is None:
-            raise ValueError("Required model components are missing. Please run the model first.")
-        
-        try:
-            # sample the posterior predictive
-            model_posterior_predictive = pm.sample_posterior_predictive(
-                trace=self._trace,
-                model=self._mmm_model
-            )
-
-            # extract the posterior predictive for y (remember that y is scaled)
-            y_scaled_posterior_predictive = az.extract(
-                data=model_posterior_predictive,
-                group="posterior_predictive",
-                var_names="y_observed",
-            )
-
-            ## unscale it back to original y-value space
-            self._y_posterior_predictive = self._y_scaler.inverse_transform(X=y_scaled_posterior_predictive)
-        except Exception as e:
-            logger.error(f"Error computing y_posterior_predictive: {e}")
-            raise e
-
-    @property
-    def y_posterior_predictive(self):
-        if self._y_posterior_predictive is None:
-            self._load_y_posterior_predictive()
-        return self._y_posterior_predictive
-
-    def _compute_accuracy_metrics(self):
-        if 'accuracy_metrics' in self.results:
-            return self.results['accuracy_metrics']
-
-        # compute mean
-        y_posterior_mean = self.y_posterior_predictive.mean(axis=1)
-
-        # compute accuracy metrics
-        r_squared = round(metrics.r2_score(self.y, y_posterior_mean), 3)
-        mse = metrics.mean_squared_error(self.y, y_posterior_mean)
-        rmse = round(np.sqrt(mse))
-        y_mean = np.mean(self.y)
-        nrmse = round(rmse/y_mean*100, 1)
-        mape = round(metrics.mean_absolute_error(self.y, y_posterior_mean)/y_mean * 100,1)
-
-        self.results['accuracy_metrics'] = {
-            'r_squared': r_squared,
-            'mse': mse,
-            'rmse': rmse,
-            'y_mean': np.mean(self.y),
-            'nrmse': nrmse,
-            'mape': mape
+        sampler_kwargs = {
+            "draws": n_draw_samples,
+            "target_accept": 0.9,
+            "chains": n_chains,
+            "random_seed": 42,
         }
 
-        self.save()
-
-        return self.results['accuracy_metrics']
+        self._mmm.fit(X=self.X, y=self.y, nuts_sampler="numpyro", **sampler_kwargs)
 
     def _generate_all_plots(self):
         self.plotter.generate_all_plots()
 
     def get_plot_url(self, plot_type):
         return self.plotter.get_plot_url(plot_type)
-    
-    @property
-    def error_percent(self):
-        if self._error_percent is None:
-            self._load_error_data()
-        return self._error_percent
-    
-    def _load_error_data(self):
-        if self.error_percent_binary:
-            self._error_percent = pickle.loads(self.error_percent_binary)
-        else:
-            self._compute_error()
-
-    def _compute_error(self):
-        
-        # 1) compute the percentual error as a distribution
-        ## 1.1) to compute a distribution, we're tiling y over n_posterior_samples to subtract the posterior_predictive from it
-        ### 1.1.1 )repeat y for every sample
-        y_repeated_per_sample = np.tile(self.y, (self.n_posterior_samples, 1))
-        ### 1.1.2) deduct the posterior predictive from it to get the absolute error
-        error = y_repeated_per_sample.T - self.y_posterior_predictive
-        ### 1.1.3) divide by the actual value of y to get the relative error (and multiply by 100 to get it in %)
-        error_percent = error / y_repeated_per_sample.T * 100
-
-        ## 1.2) Replace Inf and -Inf with NaN and then drop NaN values
-        # error_percent = error_percent.replace([float('Inf'), float('-Inf')], float('NaN'))
-        self._error_percent = np.where(np.isinf(error_percent), np.nan, error_percent)
 
 class MMModelPlotter:
     def __init__(self, model):
@@ -464,14 +294,13 @@ class MMModelPlotter:
 
     def generate_all_plots(self):
         self._generate_trace_plot()
-        self._generate_parameter_posteriors_plot()
         self._generate_y_posterior_predictive_plot()
         self._generate_error_percent_plot()
 
     def get_plot_url(self, plot_type):
         """Get or create a plot of the specified type."""
-        if plot_type not in ['trace', 'parameter_posteriors', 'y_posterior_predictive', 'error_percent']:
-            raise ValueError("Invalid plot type. Please choose from 'trace', 'parameter_posteriors', 'y_posterior_predictive' or 'error_percent'.")
+        if plot_type not in ['trace', 'y_posterior_predictive', 'error_percent']:
+            raise ValueError("Invalid plot type. Please choose from 'trace', 'y_posterior_predictive' or 'error_percent'.")
         
         plot_field = f"{plot_type}_plot"
         plot_method = getattr(self, f"_generate_{plot_type}_plot")
@@ -487,16 +316,23 @@ class MMModelPlotter:
 
     # Add the plotting methods here
     def _generate_trace_plot(self):
-        if self.model._trace is None:
-            raise ValueError("No trace found. Please run the model first.")
+        if self.model._mmm is None:
+            raise ValueError("No model found. Please build and fit the model first.")
 
-        var_names_to_plot = ["intercept", "predictor_coefficients", "sigma", "degrees_freedom"]
-        n_vars = len(var_names_to_plot)
-
+        # Plot the trace
         axes = az.plot_trace(
-            self.model._trace,
-            var_names=var_names_to_plot,
-            figsize=(15, 4*n_vars)
+            data=self.model._mmm.fit_result,
+            var_names=[
+                "intercept",
+                "y_sigma",
+                "saturation_beta",
+                "saturation_lam",
+                "adstock_alpha",
+                "gamma_control",
+                "gamma_fourier",
+            ],
+            compact=True,
+            backend_kwargs={"figsize": (12, 10), "layout": "constrained"},
         )
         fig = axes.ravel()[0].figure
 
@@ -508,158 +344,33 @@ class MMModelPlotter:
         plt.close(fig)
 
         # Save the plot directly from the buffer to the ImageField
-        self.model.trace_plot.save(f'trace_plot.png', ContentFile(buffer.getvalue()), save=True)
+        self.model.trace_plot.save(f'trace_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)
 
-    def _generate_parameter_posteriors_plot(self):
-        if self.model._trace is None:
-            raise ValueError("No trace found. Please run the model first.")
+    def _generate_y_posterior_predictive_plot(self):
+        # Sample the posterior predictive
+        self.model._mmm.sample_posterior_predictive(self.model.X, extend_idata=True, combined=True)
 
-        var_names_to_plot = ["intercept", "predictor_coefficients", "sigma"]
-        n_vars = len(var_names_to_plot)
-
-        axes = az.plot_posterior(
-            self.model._trace,
-            var_names=var_names_to_plot,
-            figsize=(15,4*n_vars) # 4 times the number of variable names
-        );
-        fig = axes.ravel()[0].figure
+        # Plot the posterior predictive
+        fig = self.model._mmm.plot_posterior_predictive(original_scale=True)
 
         # Save to an in-memory buffer
         buffer = io.BytesIO()
         fig.savefig(buffer, format='png', bbox_inches='tight')
         buffer.seek(0)
-
         plt.close(fig)
 
         # Save the plot directly from the buffer to the ImageField
-        self.model.parameter_posteriors_plot.save(f'parameter_posteriors_plot.png', ContentFile(buffer.getvalue()), save=True)
-
-    def _generate_y_posterior_predictive_plot(self):
-        
-        if self.model._y is None:
-            _, self.model._y = self.model.get_csv_file_data()
-        
-        # 1) set up percentile ranges and a colour map we'll use for plotting posterior distributions
-
-        ## Generates 100 evenly spaced percentiles between 51% and 99%
-        n_percentiles = 50
-        percentile_ranges = np.linspace(51, 99, n_percentiles)
-
-        ## choose a colour pallete
-        palette = "Greens"
-        cmap = plt.get_cmap(palette)
-
-        ## normalize the percentile range values between 0 and 1 so that it maps to the colour palette
-        color_range = (percentile_ranges - np.min(percentile_ranges)) / (np.max(percentile_ranges) - np.min(percentile_ranges))
-        color_range = np.linspace(0.1, 0.9, n_percentiles)
-
-        # 2) Plot
-
-        ## compute the posterior mean
-        y_posterior_mean = self.model.y_posterior_predictive.mean(axis=1)
-
-        ## Plot the posterior mean
-        fig, ax = plt.subplots(figsize=(15, 6))
-        # plt.figure(figsize=(15, 6))
-        ax.plot(self.model._y, color='k', label='Actual')
-        ax.plot(y_posterior_mean, color='turquoise', label='Posterior Mean')
-
-        ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
-        for i, percentile in enumerate(percentile_ranges[::-1]):
-            upper_percentile = np.percentile(self.model.y_posterior_predictive, percentile, axis=1)
-            lower_percentile = np.percentile(self.model.y_posterior_predictive, 100 - percentile, axis=1)
-            color_val = color_range[i]
-            ax.fill_between(
-                x=self.model._y.index,
-                y1=upper_percentile,
-                y2=lower_percentile,
-                color=cmap(color_val),
-                alpha=0.1,
-            )
-
-        ## Rotate x-axis labels
-        ax.set_xticklabels(self.model.csv_file.index, rotation=45, ha='right')
-
-        ## format the title, legend and annotate the R Squared onto the plot
-        ax.set_title('Sales - Real vs Forecast', y=1.12)
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=3)
-
-        ## format the x- and y-axis
-        ax.set_xlabel('Date')
-        ax.yaxis.set_major_formatter(FuncFormatter(currency_formatter))
-        ax.set_ylabel(f'Sales [{self.model.csv_file.currency}]')
-
-        # 3) Save the plot
-
-        ## Save to an in-memory buffer
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format='png', bbox_inches='tight')
-        buffer.seek(0)
-        plt.close(fig)
-
-        ## Save the plot directly from the buffer to the ImageField
-        self.model.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot.png', ContentFile(buffer.getvalue()), save=True)
+        self.model.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)
 
     def _generate_error_percent_plot(self):
-        # 1) compute the percentual error as a distribution
-        error_percent_mean = self.model.error_percent.mean(axis=1)
+        # Plot the error percent
+        fig = self.model._mmm.plot_errors(original_scale=True)
 
-        # 2) plot
-        ### Generates 100 evenly spaced percentiles between 51% and 99%
-        n_percentiles = 50
-        percentile_ranges = np.linspace(51, 99, n_percentiles)
-
-        ## choose a colour pallete
-        palette = "YlOrRd"
-        cmap = plt.get_cmap(palette)
-
-        ## normalize the percentile range values between 0 and 1 so that it maps to the colour palette
-        color_range = (percentile_ranges - np.min(percentile_ranges)) / (np.max(percentile_ranges) - np.min(percentile_ranges))
-        color_range = np.linspace(0.1, 0.9, n_percentiles)
-
-        ## Plot the posterior mean
-        fig, ax = plt.subplots(figsize=(15, 6))
-        ax.plot(error_percent_mean, color='yellow', label='Error Mean')
-
-        ## Plot the distribution by looping over each percentile and filling it with a colour from the colour map
-        for i, percentile in enumerate(percentile_ranges[::-1]):
-            upper_percentile = np.percentile(self.model.error_percent, percentile, axis=1)
-            lower_percentile = np.percentile(self.model.error_percent, 100 - percentile, axis=1)
-            color_val = color_range[i]
-            ax.fill_between(
-                x=self.model.csv_file.index,
-                y1=upper_percentile,
-                y2=lower_percentile,
-                color=cmap(color_val),
-                alpha=0.1,
-            )
-
-        ## Rotate x-axis labels
-        ax.set_xticklabels(self.model.csv_file.index, rotation=45, ha='right')
-
-        ## format the title, legend and annotate the R Squared onto the plot
-        ax.set_title('Error [%] of forecast vs real', y=1.12)
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.12), ncol=3)
-
-        ## format the x- and y-axis
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Error [%]')
-        ax.set_ylim(-100, 100)
-
-        # Add reference lines at 0%, +10% and -10%
-        plt.axhline(y=0, color='black', linestyle='-', linewidth=1.0)
-        plt.axhline(y=10, color='black', linestyle='--', linewidth=1.0)
-        plt.axhline(y=-10, color='black', linestyle='--', linewidth=1.0)
-
-        mean_absolute_error = round(abs(error_percent_mean).mean(), 1)
-        ax.annotate(f'Mean Absolute Error:  {mean_absolute_error}%', xycoords='axes fraction', xy=[0.03, 0.92])
-
-        # 3) Save the plot
-        ## Save to an in-memory buffer
+        # Save to an in-memory buffer
         buffer = io.BytesIO()
         fig.savefig(buffer, format='png', bbox_inches='tight')
         buffer.seek(0)
         plt.close(fig)
 
-        ## Save the plot directly from the buffer to the ImageField
+        # Save the plot directly from the buffer to the ImageField
         self.model.error_percent_plot.save(f'error_percent_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)

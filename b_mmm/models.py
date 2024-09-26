@@ -302,22 +302,27 @@ class MMModelPlotter:
         if plot_type not in ['trace', 'y_posterior_predictive', 'error_percent']:
             raise ValueError("Invalid plot type. Please choose from 'trace', 'y_posterior_predictive' or 'error_percent'.")
         
-        plot_field = f"{plot_type}_plot"
+        plot_field_name = f"{plot_type}_plot"
         plot_method = getattr(self, f"_generate_{plot_type}_plot")
 
-        if not getattr(self.model, plot_field):
+        if not getattr(self.model, plot_field_name):
             logger.info(f"Generating new {plot_type} plot for MMM {self.model.id}")
             plot_method()
         else:
             logger.info(f"Using existing {plot_type} plot for MMM {self.model.id}")
         
-        plot_url = getattr(self.model, plot_field).url
+        plot_field = getattr(self.model, plot_field_name)
+        plot_url = plot_field.url if plot_field else None
+        if plot_url is None:
+            logger.debug(f"No {plot_type} plot URL available for MMM {self.model.id}")
         return plot_url
 
     # Add the plotting methods here
     def _generate_trace_plot(self):
         if self.model._mmm is None:
-            raise ValueError("No model found. Please build and fit the model first.")
+            logger.debug("No model found so not generating trace plot.")
+            return
+            # raise ValueError("No model found. Please build and fit the model first.") # TODO remove this
 
         # Plot the trace
         axes = az.plot_trace(
@@ -347,6 +352,10 @@ class MMModelPlotter:
         self.model.trace_plot.save(f'trace_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)
 
     def _generate_y_posterior_predictive_plot(self):
+        if self.model._mmm is None:
+            logger.debug("No model found so not generating posterior predictive plot.")
+            return
+
         # Sample the posterior predictive
         self.model._mmm.sample_posterior_predictive(self.model.X, extend_idata=True, combined=True)
 
@@ -363,6 +372,10 @@ class MMModelPlotter:
         self.model.y_posterior_predictive_plot.save(f'y_posterior_predictive_plot_{self.model.id}.png', ContentFile(buffer.getvalue()), save=True)
 
     def _generate_error_percent_plot(self):
+        if self.model._mmm is None:
+            logger.debug("No model found so not generating error percent plot.")
+            return
+
         # Plot the error percent
         fig = self.model._mmm.plot_errors(original_scale=True)
 

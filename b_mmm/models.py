@@ -59,12 +59,13 @@ class CSVFile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to=get_file_path)
     cleaned_data_file = models.FileField(upload_to=get_cleaned_file_path, null=True, blank=True)
-    
-    # columns
-    date_column = models.CharField(max_length=255, default='date')
-    sales_column = models.CharField(max_length=255, default='sales')
-    predictor_columns = models.JSONField(default=list)  # List of predictor column names
     currencies = models.JSONField(default=dict)  # List of predictor currencies
+    
+    # column names
+    date_name = models.CharField(max_length=255, default='date')
+    sales_name = models.CharField(max_length=255, default='sales')
+    predictor_names = models.JSONField(default=list)  # List of predictor column names
+    
 
     # _cached_data is for internal use only and can be either a pandas DataFrame or None.
     _cached_data: Optional[pd.DataFrame] = None # TODO when lazy loading this, load it from cleaned_data_file
@@ -95,27 +96,27 @@ class CSVFile(models.Model):
     @property
     def currency(self) -> str:
         """Get the currency used in the CSV file (derived from sales column)."""
-        return self.currencies[self.sales_column]
+        return self.currencies[self.sales_name]
     
     @property
     def predictor_currencies(self) -> List[str]:
         """Get the currencies used in predictor columns."""
-        return [self.currencies[col] for col in self.predictor_columns]
+        return [self.currencies[col] for col in self.predictor_names]
     
     @property
     def sales(self) -> pd.Series:
         """Get cleaned sales data (without currency symbol and converted to float)."""
-        return self.data[self.sales_column]
+        return self.data[self.sales_name]
     
     @property
     def predictors(self) -> pd.DataFrame:
         """Get cleaned predictor data."""
-        return self.data[self.predictor_columns]
-    
+        return self.data[self.predictor_names]
+
     @property
-    def predictor_names(self) -> List[str]:
-        """Get the names of the predictor columns."""
-        return self.predictor_columns
+    def date(self) -> pd.Series:
+        """Get the date column."""
+        return self.data[self.date_name]
     
     @classmethod
     def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile': # TODO: ask why we still need classmethod instead of just __init__?
@@ -133,9 +134,9 @@ class CSVFile(models.Model):
                 user=user,
                 file_name=csv_file.name,
                 file=csv_file,
-                date_column=headers[0],
-                sales_column=headers[1],
-                predictor_columns=headers[2:]
+                date_name=headers[0],
+                sales_name=headers[1],
+                predictor_names=headers[2:]
             )
 
             # Clean the data and get currencies
@@ -200,24 +201,24 @@ class CSVFile(models.Model):
 
         # Convert date column to datetime
         try:
-            df[self.date_column] = df[self.date_column].apply(self.week_to_date)
-            df[self.date_column] = pd.to_datetime(df[self.date_column])
+            df[self.date_name] = df[self.date_name].apply(self.week_to_date)
+            df[self.date_name] = pd.to_datetime(df[self.date_name])
         except ValueError as e:
             raise ValidationError(f"Error converting dates: {str(e)}")
 
         # Detect currencies and convert values to floats
         currencies = {}
         for col in df.columns:
-            if col != self.date_column:
+            if col != self.date_name:
                 df[col], currency = clean_currency_values(df[col])
                 currencies[col] = currency
 
         # Drop future dates
         current_date = pd.Timestamp(datetime.now().date())
-        df = df[df[self.date_column] <= current_date]
+        df = df[df[self.date_name] <= current_date]
 
         # Sort by date and reset index
-        df = df.sort_values(by=self.date_column, ascending=True).reset_index(drop=True)
+        df = df.sort_values(by=self.date_name, ascending=True).reset_index(drop=True)
 
         return df, currencies
 
@@ -258,7 +259,8 @@ class MarketingMixModel(models.Model):
     @property
     def X(self):
         if self._X is None:
-            self._X = self.csv_file.predictors
+            # PyMC-Marketing expects X to be the predictors with the first column the date
+            self._X = pd.concat([self.csv_file.date.rename('date'), self.csv_file.predictors], axis=1)
         return self._X
     
     def _update_state(self, new_state):
@@ -319,7 +321,7 @@ class MarketingMixModel(models.Model):
         model = MMM(
             model_config=my_model_config,
             sampler_config=my_sampler_config,
-            date_column="date_week",
+            date_column="date",
             adstock=GeometricAdstock(l_max=8),
             saturation=LogisticSaturation(),
             channel_columns=self.csv_file.predictor_names,

@@ -311,7 +311,7 @@ class MarketingMixModel(models.Model):
             return
 
         with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp_file:
-            tmp_file.write(self.mmm_file.read())
+            tmp_file.write(self.saved_mmm.read())
             tmp_file.flush()
             self._mmm = MMM.load(tmp_file.name)
 

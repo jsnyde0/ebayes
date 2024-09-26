@@ -123,11 +123,3 @@ def save_model_to_file_field(model, file_field, filename):
         tmp_file.seek(0)
         file_field.save(filename, File(tmp_file))
     os.unlink(tmp_file.name)
-
-def load_model_from_file_field(model_class, file_field):
-    with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp_file:
-        tmp_file.write(file_field.read())
-        tmp_file.flush()
-        model = model_class.load(tmp_file.name)
-    os.unlink(tmp_file.name)
-    return model

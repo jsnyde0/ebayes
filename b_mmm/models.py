@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files import File
 
 import pandas as pd
 import arviz as az
@@ -18,7 +19,7 @@ import logging
 import tempfile
 
 
-from .utils import clean_currency_values, save_model_to_file_field, load_model_from_file_field
+from .utils import clean_currency_values
 
 import matplotlib
 matplotlib.use('Agg') # because TKinter backend is not thread-safe
@@ -269,7 +270,7 @@ class MarketingMixModel(models.Model):
 
     def fit_model_and_evaluate(self):
         logger.info(f"Starting model run for MMM {self.id}")
-        if self.state == 'completed':
+        if 'completed' in self.state:
             self._load_saved_results()
             return
         
@@ -284,29 +285,38 @@ class MarketingMixModel(models.Model):
         self._update_state('inferencing')
         logger.info(f"Running inference with {n_draw_samples} samples and {n_chains} chains")
         self._run_inference(n_draw_samples, n_chains)
+        self._update_state('completed')
+        logger.info(f"Model run completed for MMM {self.id}, saving results...")
+        self._save_model_to_file_field()
 
-        self._update_state('plotting')
         logger.info(f"Generating all plots for MMM {self.id}")
         self._generate_all_plots()
+        self._update_state('completed-and-plotted')
 
-        self._update_state('completed')
-        logger.info(f"Saving results for MMM {self.id}")
-        self._save_results()
-        logger.info(f"Model run completed for MMM {self.id}")
-    
-    def _save_results(self):
+    def _save_model_to_file_field(self):
         logger.info(f"Saving MMM model for instance {self.id}")
         if self._mmm is None:
             raise ValueError("No model found. Please run the model first.")
-        save_model_to_file_field(self._mmm, self.saved_mmm, f'mmm_{self.id}.nc')
+
+        with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp_file:
+            self._mmm.save(tmp_file.name)
+            tmp_file.seek(0)
+            self.saved_mmm.save(f'mmm_{self.id}.nc', File(tmp_file))
+        os.unlink(tmp_file.name)
     
     def _load_saved_results(self):
         logger.info(f"Loading saved trace and y_posterior_predictive for MMM {self.id}")
         if not self.saved_mmm:
             logger.error("No saved model file found.")
             return
-        
-        self._mmm = load_model_from_file_field(MMM, self.mmm_file)
+
+        with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp_file:
+            tmp_file.write(self.mmm_file.read())
+            tmp_file.flush()
+            self._mmm = MMM.load(tmp_file.name)
+
+        os.unlink(tmp_file.name)
+
 
     def _build_bayesian_model(self) -> MMM:        
         my_sampler_config = {"progressbar": True}

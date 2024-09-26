@@ -27,6 +27,11 @@ matplotlib.use('Agg') # because TKinter backend is not thread-safe
 
 logger = logging.getLogger(__name__)
 
+temp_dir = tempfile.gettempdir()
+if not os.access(temp_dir, os.W_OK):
+    logger.error(f"No write access to temporary directory: {temp_dir}")
+    # You might want to raise an exception here or handle it appropriately
+
 # Constants
 CSV_UPLOAD_DIR = 'csv_files'
 CLEANED_DATA_DIR = 'csv_cleaned'
@@ -359,7 +364,14 @@ class MarketingMixModel(models.Model):
         # }
 
         # self._mmm.fit(X=self.X, y=self.y, nuts_sampler="numpyro", **sampler_kwargs)
-        self._mmm.fit(X=self.X, y=self.y, target_accept=0.85, chains=4, random_seed=42)
+        try:
+            self._mmm.fit(X=self.X, y=self.y, target_accept=0.85, chains=4, random_seed=42)
+            if not hasattr(self._mmm, 'fit_result') or self._mmm.fit_result is None:
+                raise ValueError("Model fitting did not produce results.")
+        except Exception as e:
+            logger.error(f"Error during model fitting: {str(e)}")
+            self._update_state('error')
+            raise
 
     def _generate_all_plots(self):
         self.plotter.generate_all_plots()
@@ -398,8 +410,8 @@ class MMModelPlotter:
 
     # Add the plotting methods here
     def _generate_trace_plot(self):
-        if self.model._mmm is None:
-            logger.debug("No model found so not generating trace plot.")
+        if self.model._mmm is None or not hasattr(self.model._mmm, 'fit_result'):
+            logger.debug("No fitted model results found. Cannot generate trace plot.")
             return
             # raise ValueError("No model found. Please build and fit the model first.") # TODO remove this
 
@@ -412,7 +424,7 @@ class MMModelPlotter:
                 "saturation_beta",
                 "saturation_lam",
                 "adstock_alpha",
-                "gamma_control",
+                # "gamma_control",
                 "gamma_fourier",
             ],
             compact=True,

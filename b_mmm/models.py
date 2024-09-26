@@ -6,16 +6,19 @@ from django.core.files.base import ContentFile
 import pandas as pd
 import arviz as az
 import matplotlib.pyplot as plt
-import csv
+import pyarrow as pa
+import pyarrow.parquet as pq
 import io
 import os
 import uuid
 from pymc_marketing.mmm import MMM, GeometricAdstock, LogisticSaturation
-from typing import List, Optional, Dict
+from typing import List, Optional
+from datetime import datetime, timedelta
 import logging
+import tempfile
 
 
-from .utils import clean_currency_values, get_currency, save_model_to_file_field, load_model_from_file_field
+from .utils import clean_currency_values, save_model_to_file_field, load_model_from_file_field
 
 import matplotlib
 matplotlib.use('Agg') # because TKinter backend is not thread-safe
@@ -24,13 +27,19 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CSV_UPLOAD_DIR = 'csv_files'
+CLEANED_DATA_DIR = 'csv_cleaned'
 PLOT_DIR = 'plots'
 
 def get_file_path(instance: 'CSVFile', filename: str) -> str:
     """Generate a unique file path for uploaded CSV files."""
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join(CSV_UPLOAD_DIR, filename)
+    return os.path.join(CSV_UPLOAD_DIR, str(instance.user.id), filename)
+
+def get_cleaned_file_path(instance: 'CSVFile', filename: str) -> str:
+    """Generate file path for cleaned data file"""
+    cleaned_filename = f"{filename}_cleaned"
+    return os.path.join(CLEANED_DATA_DIR, str(instance.user.id), cleaned_filename)
 
 def get_model_path(instance: 'MarketingMixModel', filename: str) -> str:
     return f'mmm_models/mmm_{instance.id}.nc'
@@ -49,6 +58,7 @@ class CSVFile(models.Model):
     file_name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to=get_file_path)
+    cleaned_data_file = models.FileField(upload_to=get_cleaned_file_path, null=True, blank=True)
     
     # columns
     date_column = models.CharField(max_length=255, default='date')
@@ -56,8 +66,8 @@ class CSVFile(models.Model):
     predictor_columns = models.JSONField(default=list)  # List of predictor column names
     currencies = models.JSONField(default=dict)  # List of predictor currencies
 
-    # _data is for internal use only and can be either a pandas DataFrame or None. Optional is equivalent to Union[pd.DataFrame, None]
-    _data: Optional[pd.DataFrame] = None
+    # _cached_data is for internal use only and can be either a pandas DataFrame or None.
+    _cached_data: Optional[pd.DataFrame] = None # TODO when lazy loading this, load it from cleaned_data_file
 
     class Meta:
         verbose_name_plural = 'CSV Files'
@@ -66,63 +76,41 @@ class CSVFile(models.Model):
 
     def __str__(self) -> str:
         return self.file_name
-    
+
     @property
     def data(self) -> pd.DataFrame:
-        """Lazy load the dataset."""
-        if self._data is None:
-            self._data = pd.read_csv(self.file.path)
-            self._data.set_index(self.date_column, inplace=True)
-        return self._data
+        """Load the cleaned dataset."""
+        if self._cached_data is None:
+            if self.cleaned_data_file:
+                self._cached_data = pd.read_parquet(self.cleaned_data_file.path)
+            else:
+                raise ValueError("Cleaned data not available. The CSV file may not have been processed correctly.")
+        return self._cached_data
     
     @property
     def index(self) -> pd.Index:
         """Get the index column"""
         return self.data.index
     
-    def get_currencies(self) -> Dict[str, str]:
-        """Lazy load the currencies for each column."""
-        if not self.currencies:
-            sales_currency = get_currency(self.data[self.sales_column])
-            predictor_currencies = [get_currency(self.data[col]) for col in self.predictor_columns]
-            self.currencies = {
-                self.sales_column: sales_currency,
-                **{col: predictor_currencies[i] for i, col in enumerate(self.predictor_columns)}
-            }
-            self.save()
-        return self.currencies
-    
     @property
     def currency(self) -> str:
         """Get the currency used in the CSV file (derived from sales column)."""
-        return self.get_currencies()[self.sales_column]
+        return self.currencies[self.sales_column]
     
     @property
     def predictor_currencies(self) -> List[str]:
         """Get the currencies used in predictor columns."""
-        return [self.get_currencies()[col] for col in self.predictor_columns]
-    
-    def get_predictor_currency(self, col: str) -> str:
-        """Get the currency used in the predictor columns."""
-        if col not in self.predictor_columns:
-            raise ValueError(f"Column {col} is not a predictor column. Predictor columns are {self.predictor_columns}")
-        return self.get_currencies()[col]
+        return [self.currencies[col] for col in self.predictor_columns]
     
     @property
     def sales(self) -> pd.Series:
         """Get cleaned sales data (without currency symbol and converted to float)."""
-        return clean_currency_values(
-            self.data[self.sales_column],
-            currency_symbols=[self.currency]
-        )[0]
+        return self.data[self.sales_column]
     
     @property
     def predictors(self) -> pd.DataFrame:
         """Get cleaned predictor data."""
-        return pd.DataFrame({
-            col: clean_currency_values(self.data[col], currency_symbols=[self.get_predictor_currency(col)])[0]
-            for col in self.predictor_columns
-        })
+        return self.data[self.predictor_columns]
     
     @property
     def predictor_names(self) -> List[str]:
@@ -130,15 +118,13 @@ class CSVFile(models.Model):
         return self.predictor_columns
     
     @classmethod
-    def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile':
+    def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile': # TODO: ask why we still need classmethod instead of just __init__?
         """Process the uploaded CSV file and create a CSVFile instance."""
         try:
             csv_file.seek(0)
-            content = csv_file.read().decode('utf-8')
-            csv_file.seek(0)
+            df = pd.read_csv(csv_file)
             
-            reader = csv.DictReader(io.StringIO(content))
-            headers = reader.fieldnames
+            headers = df.columns.tolist()
             
             if not headers or len(headers) < 3:
                 raise ValidationError("CSV file must have at least 3 columns: date, sales, and at least one predictor.")
@@ -151,12 +137,91 @@ class CSVFile(models.Model):
                 sales_column=headers[1],
                 predictor_columns=headers[2:]
             )
+
+            # Clean the data and get currencies
+            cleaned_df, currencies = csv_file_instance.clean_data(df)
+            
+            # Store cleaned data as parquet file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.parquet') as tmp:
+                table = pa.Table.from_pandas(cleaned_df)
+                pq.write_table(table, tmp.name)
+                tmp_path = tmp.name
+
+            with open(tmp_path, 'rb') as f:
+                csv_file_instance.cleaned_data_file.save(f'{csv_file.name}_cleaned.parquet', f)
+
+            os.unlink(tmp_path)  # Remove the temporary file
+            
+            csv_file_instance.currencies = currencies
+            
+            csv_file_instance.save()
             
             return csv_file_instance
-        except (csv.Error, ValidationError) as e:
+        except (pd.errors.EmptyDataError, ValidationError) as e:
             raise ValidationError(f'CSV processing error: {str(e)}')
         except Exception as e:
             raise ValidationError(f'Unexpected error processing CSV: {str(e)}')
+
+    @staticmethod
+    def week_to_date(date_str):
+        """Convert various date string formats to date object"""
+        try:
+            # Try parsing as a standard date format (handles YYYY-MM-DD, MM/DD/YYYY, etc.)
+            return pd.to_datetime(date_str).date()
+        except ValueError:
+            # Check if it's in YYYY-WW format
+            if '-' in date_str and len(date_str.split('-')) == 2:
+                year, week = map(int, date_str.split('-'))
+                return CSVFile._week_number_to_date(year, week)
+            else:
+                raise ValueError(f"Unable to parse date: {date_str}")
+
+    @staticmethod
+    def _week_number_to_date(year, week):
+        """Convert year and week number to a date object"""
+        if week == 0:
+            # Handle the case where week is 0 (last week of previous year)
+            date = datetime(year-1, 12, 28)  # December 28th is always in the last week of the year
+        else:
+            # Find the first day of the given week
+            date = datetime(year, 1, 1)  # January 1st of the given year
+            date += timedelta(days=(week-1)*7)  # Move to the start of the specified week
+        
+        # Adjust to get the Monday of that week
+        while date.weekday() != 0:
+            date -= timedelta(days=1)
+        
+        return date.date()
+
+    def clean_data(self, df):
+        """Clean the dataframe by converting dates, currencies, and sorting."""
+        # Replace empty strings with 0
+        df = df.replace('', '0')
+
+        # Convert date column to datetime
+        try:
+            df[self.date_column] = df[self.date_column].apply(self.week_to_date)
+            df[self.date_column] = pd.to_datetime(df[self.date_column])
+        except ValueError as e:
+            raise ValidationError(f"Error converting dates: {str(e)}")
+
+        # Detect currencies and convert values to floats
+        currencies = {}
+        for col in df.columns:
+            if col != self.date_column:
+                df[col], currency = clean_currency_values(df[col])
+                currencies[col] = currency
+
+        # Drop future dates
+        current_date = pd.Timestamp(datetime.now().date())
+        df = df[df[self.date_column] <= current_date]
+
+        # Sort by date and reset index
+        df = df.sort_values(by=self.date_column, ascending=True).reset_index(drop=True)
+
+        return df, currencies
+
+    
 
 class MarketingMixModel(models.Model):
     csv_file = models.ForeignKey(CSVFile, on_delete=models.CASCADE, related_name='mmm')
@@ -273,14 +338,15 @@ class MarketingMixModel(models.Model):
             logger.error("No model found. Please run the model first.")
             raise ValueError("No model found. Please run the model first.")
         
-        sampler_kwargs = {
-            "draws": n_draw_samples,
-            "target_accept": 0.9,
-            "chains": n_chains,
-            "random_seed": 42,
-        }
+        # sampler_kwargs = {
+        #     "draws": n_draw_samples,
+        #     "target_accept": 0.9,
+        #     "chains": n_chains,
+        #     "random_seed": 42,
+        # }
 
-        self._mmm.fit(X=self.X, y=self.y, nuts_sampler="numpyro", **sampler_kwargs)
+        # self._mmm.fit(X=self.X, y=self.y, nuts_sampler="numpyro", **sampler_kwargs)
+        self._mmm.fit(X=self.X, y=self.y, target_accept=0.85, chains=4, random_seed=42)
 
     def _generate_all_plots(self):
         self.plotter.generate_all_plots()

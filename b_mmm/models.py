@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files import File
+from django.core.files.uploadedfile import UploadedFile
 
 import pandas as pd
 import arviz as az

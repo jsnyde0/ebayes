@@ -1,4 +1,3 @@
-import plotly.express as px
 import plotly.io as pio
 import plotly.graph_objects as go
 
@@ -34,6 +33,20 @@ def plot_sales_vs_predictor(date, sales, predictor, currencies):
 def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
     """Plot Sales vs a predictor with two y-axes."""
     fig = go.Figure()
+
+    fig = add_trace_sales_vs_predictor_double_axis(fig, date, sales, predictor, currencies)
+
+    return pio.to_html(fig, full_html=False, include_plotlyjs=False)
+
+def plot_sales_vs_predictor_single_axis(date, sales, predictor, currencies):
+    """Plot Sales vs a predictor with a single y-axis."""
+    fig = go.Figure()
+
+    fig = add_trace_sales_vs_predictor_single_axis(fig, date, sales, predictor, currencies)
+
+    return pio.to_html(fig, full_html=False, include_plotlyjs=False)
+
+def add_trace_sales_vs_predictor_double_axis(fig, date, sales, predictor, currencies):
 
     # Add sales trace
     fig.add_trace(
@@ -89,43 +102,52 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
         plot_bgcolor=COLORS['transparent']
     )
 
-    return pio.to_html(fig, full_html=False, include_plotlyjs=False)
+    return fig
 
-def plot_sales_vs_predictor_single_axis(date, sales, predictor, currencies):
-    """Plot Sales vs a predictor with a single y-axis."""
-    df = sales.to_frame(name=sales.name).assign(Date=date)
-    df[predictor.name] = predictor
-    sales_currency = currencies[sales.name]
+def add_trace_sales_vs_predictor_single_axis(fig, date, sales, predictor, currencies):
 
-    fig = px.line(
-        df, 
-        x='Date', 
-        y=[sales.name, predictor.name], 
-        labels={'value': f'Value ({sales_currency})', 'variable': ''},
-        markers=True,
-        color_discrete_map={
-            sales.name: COLORS['sales'],
-            predictor.name: COLORS['predictor']
-        }
+    # Add sales trace
+    fig.add_trace(
+        go.Scatter(
+            x=date,
+            y=sales,
+            name=sales.name,
+            mode='lines+markers',
+            line=dict(color=COLORS['sales']),
+            marker=dict(color=COLORS['sales']),
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=date,
+            y=predictor,
+            name=predictor.name,
+            mode='lines+markers',
+            line=dict(color=COLORS['predictor']),
+            marker=dict(color=COLORS['predictor']),
+        )
     )
 
     fig.update_layout(
-        paper_bgcolor=COLORS['transparent'],
-        plot_bgcolor=COLORS['transparent'],
         xaxis=dict(
             title=dict(text='Date', font=dict(color=COLORS['text'])),
             tickfont=dict(color=COLORS['text']),
-            gridcolor=COLORS['grid'],
+            gridcolor=COLORS['grid'],  # Dark grey with some transparency
             zerolinecolor=COLORS['grid']
         ),
         yaxis=dict(
-            title=dict(text=f'Value ({sales_currency})', font=dict(color=COLORS['text'])),
-            tickfont=dict(color=COLORS['text']),
+            title=f'{sales.name} ({currencies[sales.name]})',
+            titlefont=dict(color=COLORS['sales']),
+            tickfont=dict(color=COLORS['sales']),
             gridcolor=COLORS['grid'],
-            zerolinecolor=COLORS['grid']
+            zerolinecolor=COLORS['grid'],
+            range=[0, max(sales) * 1.1]
         ),
         legend=dict(font=dict(color=COLORS['text'])),
-        title=dict(font=dict(color=COLORS['text']))
+        paper_bgcolor=COLORS['transparent'],
+        plot_bgcolor=COLORS['transparent']
     )
 
-    return pio.to_html(fig, full_html=False, include_plotlyjs=False)
+    return fig
+

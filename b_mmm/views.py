@@ -92,8 +92,13 @@ def view_preview(request, file_id=None):
     predictors = csv_file.predictors
     currencies = csv_file.currencies
 
+    # 'revenue'
+    # 'fb_spend'
+    # 'email_clicks'
+    # 'search_clicks'
+
     # Plot sales vs predictor
-    plot_html = plot_sales_vs_predictor(date, sales, predictors['fb_spend'], currencies)
+    plot_html = plot_sales_vs_predictor(date, sales, predictors['email_clicks'], currencies)
 
     context = {
         'csv_file': csv_file,

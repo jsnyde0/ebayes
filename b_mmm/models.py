@@ -75,7 +75,7 @@ class CSVFile(models.Model):
     
 
     # _cached_data is for internal use only and can be either a pandas DataFrame or None.
-    _cached_data: Optional[pd.DataFrame] = None # TODO when lazy loading this, load it from cleaned_data_file
+    _cached_data: Optional[pd.DataFrame] = None
 
     class Meta:
         verbose_name_plural = 'CSV Files'
@@ -126,7 +126,7 @@ class CSVFile(models.Model):
         return self.data[self.date_name]
     
     @classmethod
-    def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile': # TODO: ask why we still need classmethod instead of just __init__?
+    def create_from_csv(cls, csv_file: 'UploadedFile', user: User) -> 'CSVFile':
         """Process the uploaded CSV file and create a CSVFile instance."""
         try:
             csv_file.seek(0)
@@ -413,7 +413,6 @@ class MMModelPlotter:
         if self.model._mmm is None or not hasattr(self.model._mmm, 'fit_result'):
             logger.debug("No fitted model results found. Cannot generate trace plot.")
             return
-            # raise ValueError("No model found. Please build and fit the model first.") # TODO remove this
 
         # Plot the trace
         axes = az.plot_trace(

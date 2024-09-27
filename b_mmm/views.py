@@ -98,11 +98,13 @@ def view_preview(request, file_id=None):
     # 'search_clicks'
 
     # Plot sales vs predictor
-    plot_html = plot_sales_vs_predictor(date, sales, predictors['fb_spend'], currencies)
-
+    plots = []
+    for predictor_name, predictor in predictors.items():
+        fig = plot_sales_vs_predictor(date, sales, predictor, currencies)
+        plots.append(fig)
     context = {
         'csv_file': csv_file,
-        'plot_html': plot_html,
+        'plots': plots,
     }
     
     return render(request, 'mmm/preview.html', context)

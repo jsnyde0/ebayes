@@ -123,6 +123,7 @@ def view_model(request):
             'mmm_results_exist': mmm is not None,
             'trace_plot_url': mmm.get_plot_url('trace'),
             'y_posterior_predictive_plot_url': mmm.get_plot_url('y_posterior_predictive'),
+            'error_percent_plot_url': mmm.get_plot_url('error_percent'),
         }
         
         return render(request, 'mmm/model.html', context)

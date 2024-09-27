@@ -20,6 +20,9 @@ def plot_sales_vs_predictor(date, sales, predictor):
     # Combine the data into a single DataFrame
     df = sales.to_frame(name='Sales').assign(Date=date, Predictor=predictor)
 
+    muted_green = 'rgba(76, 175, 80, 1)'  # More muted green, fully opaque
+    muted_red = 'rgba(215, 90, 90, 1)'
+
     # Create the Plotly line chart
     fig = px.line(
         df, 
@@ -29,8 +32,8 @@ def plot_sales_vs_predictor(date, sales, predictor):
         labels={'value': 'Amount (USD)', 'variable': 'Metric'},
         markers=True,
         color_discrete_map={
-            'Sales': settings.DAISYUI_COLORS['primary'],
-            'Predictor': settings.DAISYUI_COLORS['secondary']
+            'Sales': muted_green,
+            'Predictor': muted_red
         }
     )
 

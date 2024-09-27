@@ -34,6 +34,12 @@ def plot_sales_vs_predictor(date, sales, predictor):
         }
     )
 
+    # Set background to transparent
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',  # Overall figure background
+        plot_bgcolor='rgba(0,0,0,0)'    # Plot area background
+    )
+
     # Convert the Plotly figure to HTML for embedding in the template
     graph_html = pio.to_html(fig, full_html=False, include_plotlyjs=False)
 

@@ -7,13 +7,6 @@ from django.http import HttpResponseForbidden, FileResponse, Http404
 from .forms import CSVUploadForm
 from .models import CSVFile, MarketingMixModel
 from django.core.exceptions import ValidationError
-from .utils import load_and_preprocess_csv
-from sklearn.linear_model import LinearRegression
-import pandas as pd
-import arviz as az
-import matplotlib.pyplot as plt
-import io
-import base64
 
 # Create your views here.
 def view_home(request):
@@ -48,7 +41,7 @@ def view_preview(request, file_id=None):
         csv_file = get_object_or_404(CSVFile, id=file_id, user=request.user)
     
     # Read the CSV file
-    index = csv_file.index # values for the x-axis
+    date_index = csv_file.date.dt.strftime('%Y-%m-%d').tolist() # values for the x-axis
     sales = csv_file.sales
     predictors = csv_file.predictors
     predictor_currencies = csv_file.predictor_currencies
@@ -60,7 +53,7 @@ def view_preview(request, file_id=None):
         
         chart_data = {
             'chart_id': f'chart_{i}',
-            'index': index.tolist(),
+            'index': date_index,
             'series': [sales.tolist(), predictor.tolist()],
             'series_labels': ['Sales', predictor_name],
             'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],

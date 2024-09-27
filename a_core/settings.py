@@ -192,3 +192,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# DaisyUI color mappings
+DAISYUI_COLORS = {
+    'primary': 'var(--p)',
+    'secondary': 'var(--s)',
+    'accent': 'var(--a)',
+    # Add more as needed
+}

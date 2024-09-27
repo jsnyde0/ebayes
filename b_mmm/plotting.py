@@ -1,6 +1,7 @@
 import plotly.express as px
 import plotly.io as pio
-
+from django.conf import settings
+    
 def plot_sales_vs_predictor(date, sales, predictor):
     """
     Function to plot Sales vs a predictor (e.g., Facebook Ad Spend).
@@ -26,7 +27,11 @@ def plot_sales_vs_predictor(date, sales, predictor):
         y=['Sales', 'Predictor'], 
         title=f'Sales and {predictor.name} Over Time',
         labels={'value': 'Amount (USD)', 'variable': 'Metric'},
-        markers=True  # Add markers to the lines
+        markers=True,
+        color_discrete_map={
+            'Sales': settings.DAISYUI_COLORS['primary'],
+            'Predictor': settings.DAISYUI_COLORS['secondary']
+        }
     )
 
     # Convert the Plotly figure to HTML for embedding in the template

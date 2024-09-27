@@ -2,7 +2,7 @@ import plotly.express as px
 import plotly.io as pio
 from django.conf import settings
     
-def plot_sales_vs_predictor(date, sales, predictor):
+def plot_sales_vs_predictor(date, sales, predictor, currencies):
     """
     Function to plot Sales vs a predictor (e.g., Facebook Ad Spend).
     
@@ -20,6 +20,8 @@ def plot_sales_vs_predictor(date, sales, predictor):
     # Combine the data into a single DataFrame
     df = sales.to_frame(name=sales.name).assign(Date=date)
     df[predictor.name] = predictor
+    sales_currency = currencies[sales.name]
+    # predictor_currency = currencies[predictor.name]
 
     muted_green = 'rgba(76, 175, 80, 1)'  # More muted green, fully opaque
     muted_red = 'rgba(215, 90, 90, 1)'
@@ -30,7 +32,7 @@ def plot_sales_vs_predictor(date, sales, predictor):
         x='Date', 
         y=[sales.name, predictor.name], 
         title=f'{sales.name} vs {predictor.name}',
-        labels={'value': 'Amount (USD)', 'variable': 'Metric'},
+        labels={'value': f'Value ({sales_currency})', 'variable': 'Metric'},
         markers=True,
         color_discrete_map={
             sales.name: muted_green,

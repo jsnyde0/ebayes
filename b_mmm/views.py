@@ -48,7 +48,7 @@ def view_preview_old(request, file_id=None):
     date_index = csv_file.date.dt.strftime('%Y-%m-%d').tolist() # values for the x-axis
     sales = csv_file.sales
     predictors = csv_file.predictors
-    predictor_currencies = csv_file.predictor_currencies
+    currencies = csv_file.currencies
 
     # Create a chart for each predictor against the sales
     charts_data = []
@@ -60,11 +60,11 @@ def view_preview_old(request, file_id=None):
             'index': date_index,
             'series': [sales.tolist(), predictor.tolist()],
             'series_labels': ['Sales', predictor_name],
-            'series_axes': ['y_left', 'y_left' if predictor_currencies[i] else 'y_right'],
+            'series_axes': ['y_left', 'y_left' if currencies[predictor_name] == currencies[sales.name] else 'y_right'],
             'y_label_left': 'Sales',
-            'y_label_right': '' if predictor_currencies[i] else 'Amount',
+            'y_label_right': '' if currencies[predictor_name] == currencies[sales.name] else 'Amount',
             'y_unit_left': '€',
-            'y_unit_right': '' if predictor_currencies[i] else '#'
+            'y_unit_right': '' if currencies[predictor_name] == currencies[sales.name] else '€'
         }
         charts_data.append(chart_data)
     
@@ -90,10 +90,10 @@ def view_preview(request, file_id=None):
     date = csv_file.date.dt.strftime('%Y-%m-%d') # values for the x-axis
     sales = csv_file.sales
     predictors = csv_file.predictors
-    predictor_currencies = csv_file.predictor_currencies
+    currencies = csv_file.currencies
 
     # Plot sales vs predictor
-    plot_html = plot_sales_vs_predictor(date, sales, predictors['fb_spend'])
+    plot_html = plot_sales_vs_predictor(date, sales, predictors['fb_spend'], currencies)
 
     context = {
         'csv_file': csv_file,

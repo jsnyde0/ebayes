@@ -6,6 +6,7 @@ from django.conf import settings
 
 COLORS = {
     'grid': settings.DAISYUI_COLORS['base-300'],
+    'text': settings.DAISYUI_COLORS['base-content'],
     'sales': settings.DAISYUI_COLORS['success'],
     'predictor': settings.DAISYUI_COLORS['error'],
     'transparent': 'rgba(0,0,0,0)',
@@ -61,7 +62,8 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
     fig.update_layout(
         title=f'{sales.name} vs {predictor.name}',
         xaxis=dict(
-            title='Date',
+            title=dict(text='Date', font=dict(color=COLORS['text'])),
+            tickfont=dict(color=COLORS['text']),
             gridcolor=COLORS['grid'],  # Dark grey with some transparency
             zerolinecolor=COLORS['grid']
         ),
@@ -83,6 +85,7 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
             side='right',
             range=[0, max(predictor) * 1.1]
         ),
+        legend=dict(font=dict(color=COLORS['text'])),
         paper_bgcolor=COLORS['transparent'],
         plot_bgcolor=COLORS['transparent']
     )
@@ -100,7 +103,7 @@ def plot_sales_vs_predictor_single_axis(date, sales, predictor, currencies):
         x='Date', 
         y=[sales.name, predictor.name], 
         title=f'{sales.name} vs {predictor.name}',
-        labels={'value': f'Value ({sales_currency})', 'variable': 'Metric'},
+        labels={'value': f'Value ({sales_currency})', 'variable': ''},
         markers=True,
         color_discrete_map={
             sales.name: COLORS['sales'],
@@ -111,8 +114,20 @@ def plot_sales_vs_predictor_single_axis(date, sales, predictor, currencies):
     fig.update_layout(
         paper_bgcolor=COLORS['transparent'],
         plot_bgcolor=COLORS['transparent'],
-        xaxis=dict(gridcolor=COLORS['grid'], zerolinecolor=COLORS['grid']),
-        yaxis=dict(gridcolor=COLORS['grid'], zerolinecolor=COLORS['grid'])
+        xaxis=dict(
+            title=dict(text='Date', font=dict(color=COLORS['text'])),
+            tickfont=dict(color=COLORS['text']),
+            gridcolor=COLORS['grid'],
+            zerolinecolor=COLORS['grid']
+        ),
+        yaxis=dict(
+            title=dict(text=f'Value ({sales_currency})', font=dict(color=COLORS['text'])),
+            tickfont=dict(color=COLORS['text']),
+            gridcolor=COLORS['grid'],
+            zerolinecolor=COLORS['grid']
+        ),
+        legend=dict(font=dict(color=COLORS['text'])),
+        title=dict(font=dict(color=COLORS['text']))
     )
 
     return pio.to_html(fig, full_html=False, include_plotlyjs=False)

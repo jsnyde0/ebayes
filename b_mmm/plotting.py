@@ -18,7 +18,8 @@ def plot_sales_vs_predictor(date, sales, predictor):
         raise ValueError("Date, sales, and predictor must have the same length")
 
     # Combine the data into a single DataFrame
-    df = sales.to_frame(name='Sales').assign(Date=date, Predictor=predictor)
+    df = sales.to_frame(name=sales.name).assign(Date=date)
+    df[predictor.name] = predictor
 
     muted_green = 'rgba(76, 175, 80, 1)'  # More muted green, fully opaque
     muted_red = 'rgba(215, 90, 90, 1)'
@@ -27,13 +28,13 @@ def plot_sales_vs_predictor(date, sales, predictor):
     fig = px.line(
         df, 
         x='Date', 
-        y=['Sales', 'Predictor'], 
-        title=f'Sales and {predictor.name} Over Time',
+        y=[sales.name, predictor.name], 
+        title=f'{sales.name} vs {predictor.name}',
         labels={'value': 'Amount (USD)', 'variable': 'Metric'},
         markers=True,
         color_discrete_map={
-            'Sales': muted_green,
-            'Predictor': muted_red
+            sales.name: muted_green,
+            predictor.name: muted_red
         }
     )
 

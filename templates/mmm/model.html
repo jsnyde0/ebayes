@@ -41,7 +41,7 @@
         {% endif %}
       </div>
       <!-- parameter posteriors plot -->
-      <div class="mb-5">
+      {% comment %} <div class="mb-5">
         <h3 class="text-xl mb-2">Parameter Posteriors Plot</h3>
         {% if parameter_posteriors_plot_url %}
           <img src="{{ parameter_posteriors_plot_url }}"
@@ -52,9 +52,9 @@
         {% else %}
           <p>No parameter posteriors plot available.</p>
         {% endif %}
-      </div>
+      </div> {% endcomment %}
       <!-- accuracy metrics -->
-      <div class="mb-5">
+      {% comment %} <div class="mb-5">
         <h3 class="text-xl mb-2">Model Accuracy Metrics</h3>
         {% if mmm_accuracy_metrics %}
         <div class="relative overflow-x-auto">
@@ -86,7 +86,7 @@
         {% else %}
           <p>No accuracy metrics available.</p>
         {% endif %}
-      </div>
+      </div> {% endcomment %}
       <!-- y posterior predictive plot -->
       <div class="mb-5">
         <h3 class="text-xl mb-2">Y Posterior Predictive Plot</h3>

@@ -195,15 +195,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # DaisyUI color mappings
 DAISYUI_COLORS = {
-    'primary': '#ef9995',       # Soft pink
-    'secondary': '#a4cbb4',     # Soft green
-    'accent': '#dc8850',        # Soft yellow
+    'primary': '#ef9995',       # muted pink
+    'secondary': '#a4cbb4',     # muted green
+    'accent': '#dc8850',        # muted orange
     'neutral': '#2e282a',       # Dark grayish-brown
     'base-100': '#ece3ca',      # Light beige
     'base-200': '#e4d8b4',      # Darker beige
     'base-300': '#dbca9a',      # Even darker beige
-    'base-content': '#282425',  # Dark text color (same as neutral)
-    'primary-content': '#282425',  # Dark text color (same as neutral)
+    'base-content': '#282425',  # Dark text color
+    'primary-content': '#282425',  # Dark text color
     'info': '#2563eb',          # Blue
     'success': '#16a34a',       # Green
     'warning': '#d97706',       # Orange

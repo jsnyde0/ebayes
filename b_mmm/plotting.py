@@ -63,7 +63,6 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
         )
     )
 
-    # Set background to transparent
     fig.update_layout(
         title=f'{sales.name} vs {predictor.name}',
         xaxis=dict(
@@ -76,16 +75,18 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
             titlefont=dict(color=green),
             tickfont=dict(color=green),
             gridcolor=grid_color,  # Dark grey with some transparency
-            zerolinecolor=grid_color
+            zerolinecolor=grid_color,
+            range=[0, max(sales) * 1.1]
         ),
         yaxis2=dict(
-            title=f'{predictor.name} ({currencies.get(predictor.name, "#")})',
+            title=f'{predictor.name} ({currencies.get(predictor.name) or "#"})',
             titlefont=dict(color=red),
             tickfont=dict(color=red),
             gridcolor=grid_color,  # Dark grey with some transparency
             zerolinecolor=grid_color,
             overlaying='y',
-            side='right'
+            side='right',
+            range=[0, max(predictor) * 1.1]
         ),
         paper_bgcolor='rgba(0,0,0,0)',  # Overall figure background
         plot_bgcolor='rgba(0,0,0,0)'    # Plot area background

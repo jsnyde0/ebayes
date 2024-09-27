@@ -7,7 +7,10 @@
   <p class="mb-6 text-lg">
     Here is a preview of your data. You can download the full file <a class="link link-hover link-secondary" href="{% url 'mmm:serve_csv' csv_file.id %}">here</a>.
   </p>
-  <div id="charts-container" class="grid grid-cols-2 gap-4">
+  <div id="plotly-chart" class="w-full">
+    {{ plot_html|safe }}
+  </div>
+  {% comment %} <div id="charts-container" class="grid grid-cols-2 gap-4">
     {% for chart in charts_data %}
       <div class="h-[400px] mb-5">
         <c-line-chart 
@@ -25,5 +28,5 @@
         />
       </div>
     {% endfor %}
-  </div>
+  </div> {% endcomment %}
 {% endblock main %}

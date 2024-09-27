@@ -60,7 +60,6 @@ def plot_sales_vs_predictor_double_axis(date, sales, predictor, currencies):
     )
 
     fig.update_layout(
-        title=f'{sales.name} vs {predictor.name}',
         xaxis=dict(
             title=dict(text='Date', font=dict(color=COLORS['text'])),
             tickfont=dict(color=COLORS['text']),
@@ -102,7 +101,6 @@ def plot_sales_vs_predictor_single_axis(date, sales, predictor, currencies):
         df, 
         x='Date', 
         y=[sales.name, predictor.name], 
-        title=f'{sales.name} vs {predictor.name}',
         labels={'value': f'Value ({sales_currency})', 'variable': ''},
         markers=True,
         color_discrete_map={

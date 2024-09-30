@@ -1,0 +1,21 @@
+[project]
+name = "ebayes"
+version = "0.1.0"
+description = "Bayesian Marketing Mix Modeling app for ecommerce stores based on pymc-marketing"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.1.1",
+    "django-admin-honeypot-updated-2021>=1.2.0",
+    "django-cotton>=0.9.23",
+    "django-environ>=0.11.2",
+    "django-htmx>=1.18.0",
+    "djlint>=1.34.1",
+    "django-htmx>=1.18.0",
+    "pandas>=2.2.2",
+    "plotly>=5.23.0",
+    "pyarrow>=17.0.0",
+    "pytensor>=2.22.1",
+    "pymc-marketing>=0.9.0",
+    "whitenoise>=6.7.0",
+]

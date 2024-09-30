@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+import tempfile
+import os
+from django.core.files import File
 
 def currency_formatter(x, currency_symbol='€', decimal_places=0, thousands_sep=',', decimal_sep='.'):
     """
@@ -106,3 +109,17 @@ def load_and_preprocess_csv(csv_file):
         df[col], _ = clean_currency_values(df[col])
     df.set_index(date_column, inplace=True)
     return df
+
+def save_model_to_file_field(model, file_field, filename):
+    """
+    Save a model with a custom save method to a Django FileField.
+    
+    :param model: The model object with a save method that takes a filename
+    :param file_field: The Django FileField to save the model to
+    :param filename: The name to give the saved file
+    """
+    with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp_file:
+        model.save(tmp_file.name)
+        tmp_file.seek(0)
+        file_field.save(filename, File(tmp_file))
+    os.unlink(tmp_file.name)

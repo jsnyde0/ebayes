@@ -5,11 +5,11 @@ set -o errexit
 # Create a directory for uv
 mkdir -p $HOME/.local/bin
 
-# Download uv binary
-curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-linux-x64 -o $HOME/.local/bin/uv
+# Set UV_INSTALL_DIR to the local bin directory
+export UV_INSTALL_DIR="$HOME/.local/bin"
 
-# Make uv executable
-chmod +x $HOME/.local/bin/uv
+# Install uv using the official installer
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Add the local bin directory to PATH
 export PATH="$HOME/.local/bin:$PATH"

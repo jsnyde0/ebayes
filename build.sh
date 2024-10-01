@@ -2,20 +2,23 @@
 # exit on error
 set -o errexit
 
-# Create a directory for uv
-mkdir -p /opt/render/.local/bin/bin
-
-# Set UV_INSTALL_DIR to the correct directory
-export UV_INSTALL_DIR="/opt/render/.local/bin/bin"
-
 # Install uv using the official installer
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Add the installation directory to PATH
-export PATH="/opt/render/.local/bin/bin:$PATH"
+# Find the actual installation directory
+UV_INSTALL_DIR=$(dirname $(dirname $(which uv)))
 
-# Source the environment file created by the installer
-source /opt/render/.local/bin/env
+# Add the installation directory to PATH
+export PATH="$UV_INSTALL_DIR:$PATH"
+
+# Find and source the environment file
+ENV_FILE=$(find $UV_INSTALL_DIR -name "env" | head -n 1)
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+else
+    echo "Environment file not found"
+    exit 1
+fi
 
 # Verify uv installation
 which uv

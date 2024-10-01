@@ -2,11 +2,14 @@
 # exit on error
 set -o errexit
 
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Create a directory for uv
+mkdir -p $HOME/.local/bin
 
-# Add uv to PATH
-export PATH="/root/.cargo/bin:$PATH"
+# Install uv to the local directory
+curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --install-dir $HOME/.local/bin
+
+# Add the local bin directory to PATH
+export PATH="$HOME/.local/bin:$PATH"
 
 # Create and activate virtual environment
 uv venv .venv

@@ -3,16 +3,22 @@
 set -o errexit
 
 # Create a directory for uv
-mkdir -p $HOME/.local/bin
+mkdir -p /opt/render/.local/bin/bin
 
-# Set UV_INSTALL_DIR to the local bin directory
-export UV_INSTALL_DIR="$HOME/.local/bin"
+# Set UV_INSTALL_DIR to the correct directory
+export UV_INSTALL_DIR="/opt/render/.local/bin/bin"
 
 # Install uv using the official installer
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Add the local bin directory to PATH
-export PATH="$HOME/.local/bin:$PATH"
+# Add the installation directory to PATH
+export PATH="/opt/render/.local/bin/bin:$PATH"
+
+# Source the environment file created by the installer
+source /opt/render/.local/bin/env
+
+# Verify uv installation
+which uv
 
 # Create and activate virtual environment
 uv venv .venv

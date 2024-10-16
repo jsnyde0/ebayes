@@ -79,8 +79,9 @@
                     aria-expanded="false"
                     data-dropdown-toggle="dropdown">
                 <span class="sr-only">Open user menu</span>
+                
                 <img class="w-8 h-8 rounded-full"
-                     src="https://flowbite.s3.amazonaws.com/blocks/marketing-ui/avatars/michael-gough.png"
+                     src="{% if user.is_authenticated %}https://flowbite.s3.amazonaws.com/blocks/marketing-ui/avatars/michael-gough.png{% else %}{% static 'img/icons8-avatar-50.png' %}{% endif %}"
                      alt="user photo"
                      width="32"
                      height="32" />
@@ -88,6 +89,7 @@
             <!-- Dropdown menu -->
             <div class="hidden z-50 my-4 w-56 text-base list-none bg-base-100 divide-y divide-gray-100 shadow dark:bg-base-300 dark:divide-gray-600 rounded-xl"
                  id="dropdown">
+                 {% if user.is_authenticated %}
                 <div class="py-3 px-4">
                     <span class="block text-sm font-semibold text-base-content dark:text-base-100">Neil Sims</span>
                     <span class="block text-sm text-base-content truncate dark:text-base-100">name@flowbite.com</span>
@@ -103,13 +105,22 @@
                            class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:text-gray-400 dark:hover:text-base-100">Account settings</a>
                     </li>
                 </ul>
+                {% endif %}
 
                 <ul class="py-1 text-base-content dark:text-gray-300"
                     aria-labelledby="dropdown">
+                    {% if user.is_authenticated %}
                     <li>
                         <a href="#"
                            class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Sign out</a>
                     </li>
+                    {% else %}
+                    <li><a href="{% url 'profiles:account_login' %}"
+                        class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Log In</a></li>
+                    <li><a href="{% url 'profiles:account_signup' %}"
+                        class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Sign Up</a></li>
+                    {% endif %}
+                    
                 </ul>
             </div>
         </div>

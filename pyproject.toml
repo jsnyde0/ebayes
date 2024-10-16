@@ -18,4 +18,5 @@ dependencies = [
     "pytensor>=2.22.1",
     "pymc-marketing>=0.9.0",
     "whitenoise>=6.7.0",
+    "django-allauth>=65.0.2",
 ]

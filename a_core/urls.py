@@ -24,6 +24,7 @@ urlpatterns = [
     path('thebaws/', admin.site.urls),
 	path('admin/', include('admin_honeypot.urls', namespace='admin_honeypot')),
     path('', include('b_mmm.urls')),
+    path('accounts/', include('allauth.urls')),
 ]
 
 if settings.DEBUG:

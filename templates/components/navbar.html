@@ -115,9 +115,9 @@
                            class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Sign out</a>
                     </li>
                     {% else %}
-                    <li><a href="{% url 'profiles:account_login' %}"
+                    <li><a href="{% url 'account_login' %}"
                         class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Log In</a></li>
-                    <li><a href="{% url 'profiles:account_signup' %}"
+                    <li><a href="{% url 'account_signup' %}"
                         class="block py-2 px-4 text-sm hover:bg-base-200 dark:hover:bg-neutral-content dark:hover:text-base-100">Sign Up</a></li>
                     {% endif %}
                     
